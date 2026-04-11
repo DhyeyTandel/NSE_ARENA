@@ -1,0 +1,150 @@
+/* tokens.css */
+:root {
+  /* ── Backgrounds ── */
+  --ink: #0a0a0b; /* app background — true near-black */
+  --ink2: #18181b; /* surface — cards, panels */
+  --ink3: #27272a; /* raised surface — inputs, hover states */
+
+  /* ── Text ── */
+  --text: #fafafa; /* primary text */
+  --text2: #a1a1aa; /* secondary — labels, subtitles */
+  --text3: #52525b; /* tertiary — hints, placeholders */
+  --dim: #3f3f46; /* disabled / very muted */
+
+  /* ── Borders ── */
+  --border: #ffffff09; /* default — almost invisible structure */
+  --border2: #ffffff14; /* emphasis — input outlines, card borders */
+  --border3: #ffffff22; /* strong — focused inputs, avatars */
+
+  /* ── Signature accent ── */
+  --gold: #c9a84c; /* used ONLY for user's own data + Trader Score */
+  --gold-dim: #c9a84c12; /* gold background fill */
+  --gold-glow: #c9a84c30; /* gold border / ring */
+
+  /* ── Semantic ── */
+  --up: #34d399; /* gains, buy actions, positive */
+  --dn: #f87171; /* losses, sell actions, negative */
+  --blue: #60a5fa; /* AI agent, neutral info */
+
+  /* ── Derived fills ── */
+  --up-dim: #34d39912;
+  --dn-dim: #f8717112;
+  --blue-dim: #60a5fa12;
+
+  /* ── Radius ── */
+  --r: 6px; /* inputs, tags, small elements */
+  --r2: 10px; /* cards, panels */
+  --r3: 12px; /* app shell, large containers */
+
+  /* ── Spacing scale ── */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+}
+
+/* Apply globally */
+body {
+  font-family: "Geist", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--ink);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Scale ── */
+.t-label {
+  /* Section headers, column headers, stat labels */
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+}
+
+.t-body {
+  /* General UI text, descriptions */
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text2);
+  line-height: 1.65;
+}
+
+.t-strong {
+  /* Trader names, symbol names, primary content */
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.t-title {
+  /* Screen titles, section headings */
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  color: var(--text);
+}
+
+.t-kpi {
+  /* Large KPI numbers on dashboard */
+  font-family: "DM Mono", monospace;
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.t-mono {
+  /* Prices, P&L, timestamps, scores in tables */
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text2);
+}
+
+.t-mono-sm {
+  /* Small monospace labels */
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  font-weight: 300;
+  color: var(--text3);
+}
+
+/* ── Semantic color modifiers ── */
+.up {
+  color: var(--up);
+}
+.dn {
+  color: var(--dn);
+}
+.gold {
+  color: var(--gold);
+}
+.blue {
+  color: var(--blue);
+}
+
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ── Animations ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
