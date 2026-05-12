@@ -1,23 +1,11 @@
 // screens/Dashboard.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { KpiCard } from '../components/KpiCard';
-import { PriceChart } from '../components/PriceChart';
+import { TradingViewChart } from '../components/TradingViewChart';
 import { OrderPanel } from '../components/OrderPanel';
 import { PositionsTable } from '../components/PositionsTable';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { usePortfolio } from '../hooks/usePortfolio';
-
-// Demo data for initial display (fallback)
-const DEMO_CHART_DATA = Array.from({ length: 30 }, (_, i) => {
-  const base = 2800 + Math.random() * 200;
-  return {
-    time: Math.floor(Date.now() / 1000) - (30 - i) * 86400,
-    open: base,
-    high: base + Math.random() * 40,
-    low: base - Math.random() * 40,
-    close: base + (Math.random() - 0.5) * 60,
-  };
-});
 
 const DEMO_POSITIONS = [
   { ticker: 'RELIANCE', quantity: 10, avg_price: 2847.30, current_price: 2891.45, state: 'confirmed' },
@@ -28,7 +16,6 @@ const DEMO_POSITIONS = [
 const WS_URL = 'ws://localhost:8000/ws/prices';
 
 export function Dashboard({ token, user }) {
-  const [chartData, setChartData] = useState(DEMO_CHART_DATA);
   const [selectedTicker, setSelectedTicker] = useState('RELIANCE');
 
   // Fetch real portfolio if authenticated
@@ -82,24 +69,6 @@ export function Dashboard({ token, user }) {
   const selectedLivePrice = livePrices[selectedTicker];
   const displayPrice = selectedLivePrice?.price || 2891.45;
   const displayChangePct = selectedLivePrice?.change_pct || 1.55;
-
-  // Try to fetch real chart data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch(`http://localhost:8000/price/${selectedTicker}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.ohlcv && data.ohlcv.length > 0) {
-            setChartData(data.ohlcv);
-          }
-        }
-      } catch {
-        // Use demo data
-      }
-    };
-    fetchData();
-  }, [selectedTicker]);
 
   const handleSubmit = async (order) => {
     if (!token) return;
@@ -213,7 +182,7 @@ export function Dashboard({ token, user }) {
               ))}
             </div>
           </div>
-          <PriceChart data={chartData} ticker={selectedTicker} />
+          <TradingViewChart key={selectedTicker} symbol={selectedTicker} height={360} />
         </div>
 
         {/* Order Panel */}

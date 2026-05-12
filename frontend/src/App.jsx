@@ -7,6 +7,7 @@ import { Dashboard } from './screens/Dashboard';
 import { Leaderboard } from './screens/Leaderboard';
 import { AIFeed } from './screens/AIFeed';
 import { Profile } from './screens/Profile';
+import { ScriptEditor } from './screens/ScriptEditor';
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('dashboard');
@@ -62,6 +63,8 @@ function App() {
         return <Leaderboard token={token} />;
       case 'ai-feed':
         return <AIFeed />;
+      case 'scripts':
+        return <ScriptEditor token={token} />;
       case 'profile':
         return <Profile token={token} user={user} />;
       default:

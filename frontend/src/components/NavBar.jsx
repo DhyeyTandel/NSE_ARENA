@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 
 export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
-  const tabs = ['dashboard', 'leaderboard', 'ai-feed', 'profile'];
+  const tabs = ['dashboard', 'leaderboard', 'ai-feed', 'scripts', 'profile'];
   const [season, setSeason] = useState(null);
 
   // Fetch active season info

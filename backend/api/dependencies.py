@@ -35,3 +35,24 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+
+
+async def get_current_user_optional(
+    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns user if authenticated, None otherwise (no 401)."""
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+
+    from sqlalchemy import select
+    from db.models import User
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    return result.scalar_one_or_none()

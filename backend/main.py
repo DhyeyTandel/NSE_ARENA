@@ -9,6 +9,7 @@ from database import init_db, async_session
 from api.routes import auth, trades, portfolio, leaderboard, websocket
 from api.routes import seasons as seasons_router
 from api.routes import ai as ai_router
+from api.routes import scripts as scripts_router
 from market_data.broadcaster import PriceBroadcaster
 from ai.scheduler import ai_scheduler
 
@@ -107,6 +108,7 @@ app.include_router(leaderboard.router)
 app.include_router(websocket.router)
 app.include_router(seasons_router.router)
 app.include_router(ai_router.router)
+app.include_router(scripts_router.router)
 
 
 @app.get("/")

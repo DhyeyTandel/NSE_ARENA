@@ -126,3 +126,14 @@ class AIDecision(Base):
     guardrail_status = Column(String(20), default="approved")  # "approved" or "blocked"
     guardrail_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserScript(Base):
+    __tablename__ = "user_scripts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    code = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

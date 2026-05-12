@@ -1,7 +1,7 @@
 # config.py
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost:5432/nse_arena")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./nse_arena.db")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
