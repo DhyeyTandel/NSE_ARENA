@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 # 🏟️ NSE Arena
 
@@ -23,13 +23,13 @@ Practice trading NSE stocks risk-free. Compete on seasonal leaderboards. Write c
 | **Paper Trading** | Buy / sell NSE-listed stocks with ₹1,00,000 virtual capital per season |
 | **Live Market Data** | Real-time OHLCV data via yfinance, streamed over WebSockets through Redis Pub/Sub |
 | **TradingView Charts** | Full TradingView Advanced Chart widget embedded for professional-grade charting |
-| **PineScript Editor** | Write & run PineScript-lite scripts — a custom scripting engine that supports SMA, EMA, RSI, MACD, Bollinger Bands, and more |
-| **Indicator Overlay** | Script outputs are rendered on a `lightweight-charts` instance with multi-pane support |
+| **PineScript Editor** | Write and run PineScript-lite scripts — a custom scripting engine that supports SMA, EMA, RSI, MACD, Bollinger Bands, and more |
+| **Indicator Overlay** | Script outputs are rendered on a lightweight-charts instance with multi-pane support |
 | **AI Agents** | Background Gemini-powered AI agents that autonomously analyze and trade |
 | **Seasonal Competitions** | Time-boxed seasons (default 30 days) with separate leaderboards |
 | **Trader Scoring** | Multi-factor scoring: returns, risk management, consistency, discipline |
 | **Leaderboard** | Ranked standings with live PnL tracking |
-| **Auth System** | JWT-based registration & login with bcrypt password hashing |
+| **Auth System** | JWT-based registration and login with bcrypt password hashing |
 
 ---
 
@@ -45,7 +45,7 @@ Practice trading NSE stocks risk-free. Compete on seasonal leaderboards. Write c
 │       │              │                │           │
 │       └──────────────┼────────────────┘           │
 │                      │  REST + WebSocket          │
-└──────────────────────┼───────────────────────────-┘
+└──────────────────────┼────────────────────────────┘
                        │
 ┌──────────────────────┼────────────────────────────┐
 │              Backend (FastAPI + Uvicorn)           │
@@ -67,7 +67,7 @@ Practice trading NSE stocks risk-free. Compete on seasonal leaderboards. Write c
 ## 📂 Project Structure
 
 ```
-StockPaper/
+NSE_ARENA/
 ├── backend/
 │   ├── main.py                 # FastAPI app & lifespan events
 │   ├── config.py               # Environment / app configuration
@@ -123,8 +123,8 @@ StockPaper/
 
 ### Prerequisites
 
-- **Node.js** ≥ 18
-- **Python** ≥ 3.11
+- **Node.js** >= 18
+- **Python** >= 3.11
 - **Redis** (optional — app degrades gracefully without it)
 - **PostgreSQL** (or use the default SQLite for local dev)
 
@@ -155,7 +155,7 @@ cp .env .env.local
 uvicorn main:app --reload --port 8000
 ```
 
-The API will be available at `http://localhost:8000`.  
+The API will be available at `http://localhost:8000`.
 Swagger docs at `http://localhost:8000/docs`.
 
 ### 3. Frontend Setup
@@ -191,12 +191,12 @@ This starts the backend, PostgreSQL, and Redis together.
 | `POST` | `/auth/login` | Get JWT access token |
 | `GET` | `/price/{ticker}` | Fetch OHLCV data for an NSE stock |
 | `POST` | `/trades/` | Place a buy/sell order |
-| `GET` | `/portfolio/` | Get current holdings & PnL |
+| `GET` | `/portfolio/` | Get current holdings and PnL |
 | `GET` | `/leaderboard/` | Season leaderboard standings |
 | `GET` | `/seasons/active` | Current active season info |
 | `POST` | `/scripts/run` | Execute a PineScript-lite script |
 | `GET` | `/scripts/templates` | List built-in script templates |
-| `GET` | `/score/{user_id}` | Get trader score & grade |
+| `GET` | `/score/{user_id}` | Get trader score and grade |
 | `GET` | `/health` | Health check (incl. Redis status) |
 | `WS` | `/ws/{user_id}` | Live price stream via WebSocket |
 
@@ -217,7 +217,7 @@ The scripting engine supports a subset of PineScript v5 syntax. Write scripts in
 
 **Example script:**
 
-```pinescript
+```pine
 //@version=5
 indicator("Golden Cross", overlay=true)
 
@@ -240,7 +240,7 @@ sellSignal = ta.crossunder(fast, slow)
 | **Frontend** | React 19, Vite 8, TradingView Widget, lightweight-charts, Monaco Editor |
 | **Backend** | FastAPI, Uvicorn, SQLAlchemy 2.0 (async), Pydantic v2 |
 | **Database** | PostgreSQL 15 (prod) / SQLite (local dev) |
-| **Cache & Pub/Sub** | Redis 7 |
+| **Cache and Pub/Sub** | Redis 7 |
 | **Market Data** | yfinance |
 | **AI** | Google Gemini (generativeai SDK) |
 | **Auth** | JWT (python-jose) + bcrypt (passlib) |
@@ -269,4 +269,3 @@ This project is for educational and personal use.
 <div align="center">
   <sub>Built with ☕ and 📈 by <a href="https://github.com/DhyeyTandel">Dhyey Tandel</a></sub>
 </div>
-]]>
