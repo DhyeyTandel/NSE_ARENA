@@ -22,41 +22,26 @@ export function Profile({ token, user }) {
 
   const displayUser = user || { username: 'DhyeyTrader', initials: 'DT' };
 
-  // Fetch real score data
   useEffect(() => {
     if (!token || !user) return;
-
     const fetchScore = async () => {
       try {
         const response = await fetch(`http://localhost:8000/score/${user.id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setScoreData(data);
-        }
-      } catch {
-        // Use defaults
-      }
+        if (response.ok) setScoreData(await response.json());
+      } catch { /* Use defaults */ }
     };
-
     const fetchPortfolio = async () => {
       try {
         const response = await fetch('http://localhost:8000/portfolio', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (response.ok) {
-          const data = await response.json();
-          setPortfolioData(data);
-        }
-      } catch {
-        // Use defaults
-      }
+        if (response.ok) setPortfolioData(await response.json());
+      } catch { /* Use defaults */ }
     };
-
     fetchScore();
     fetchPortfolio();
   }, [token, user]);
 
-  // Build breakdown from score data or defaults
   const breakdown = scoreData ? [
     { key: 'returns', label: 'Returns', weight: 30, score: scoreData.breakdown.returns_score },
     { key: 'risk', label: 'Risk management', weight: 30, score: scoreData.breakdown.risk_score },
@@ -66,91 +51,130 @@ export function Profile({ token, user }) {
 
   const finalScore = scoreData?.final_score || 300;
   const grade = scoreData?.grade || 'Beginner';
-
   const totalReturn = portfolioData?.total_return || 0;
   const totalReturnPct = portfolioData?.total_return_pct || 0;
   const totalValue = portfolioData?.total_value || 100000;
 
-  // Animate score bars on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setAnimatedScores(breakdown);
-    }, 100);
+    const timer = setTimeout(() => setAnimatedScores(breakdown), 100);
     return () => clearTimeout(timer);
   }, [scoreData]);
 
+  // Score ring SVG
+  const maxScore = 1000;
+  const scorePercent = Math.min(finalScore / maxScore, 1);
+  const circumference = 2 * Math.PI * 52;
+  const strokeDashoffset = circumference * (1 - scorePercent);
+
   return (
-    <div>
+    <div style={{ animation: 'fadeIn 0.3s var(--ease)' }}>
       {/* Profile header */}
       <div style={{
-        padding: '24px 20px',
+        padding: '32px 24px',
         borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: '20px'
+        display: 'flex', alignItems: 'center', gap: '24px',
+        animation: 'fadeInUp 0.4s var(--ease)',
       }}>
         {/* Avatar */}
         <div style={{
-          width: '48px', height: '48px', borderRadius: '50%',
+          width: '64px', height: '64px', borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '16px', fontWeight: 600, flexShrink: 0,
-          background: 'var(--gold-dim)', border: '1px solid var(--gold-glow)',
-          color: 'var(--gold)'
+          fontSize: '22px', fontWeight: 700, flexShrink: 0,
+          background: 'linear-gradient(135deg, var(--gold-dim) 0%, var(--ink3) 100%)',
+          border: '3px solid var(--gold-glow)',
+          color: 'var(--gold)',
+          boxShadow: 'var(--shadow-gold)',
         }}>
           {displayUser.initials}
         </div>
 
         <div>
-          <div style={{ fontSize: '16px', fontWeight: 500, letterSpacing: '-0.3px' }}>
+          <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.4px' }}>
             {displayUser.username}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '2px' }}>
-            {displayUser.email || 'Paper trader'}
+          <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '3px' }}>
+            {displayUser.email || 'Paper trader · NSE Arena'}
           </div>
         </div>
 
-        {/* Big score */}
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+        {/* Score ring */}
+        <div style={{ marginLeft: 'auto', textAlign: 'center', position: 'relative' }}>
+          <svg width="110" height="110" style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx="55" cy="55" r="52" fill="none" stroke="var(--ink3)" strokeWidth="5" />
+            <circle
+              cx="55" cy="55" r="52" fill="none"
+              stroke="var(--gold)" strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              style={{ transition: 'stroke-dashoffset 1.2s var(--ease)' }}
+            />
+          </svg>
           <div style={{
-            fontFamily: 'DM Mono, monospace', fontSize: '40px',
-            fontWeight: 300, color: 'var(--gold)', lineHeight: 1,
-            letterSpacing: '-1px'
+            position: 'absolute', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
           }}>
-            {finalScore}
-          </div>
-          <div style={{
-            fontSize: '11px', color: 'var(--gold)',
-            marginTop: '4px', fontFamily: 'DM Mono, monospace'
-          }}>
-            {grade}
+            <div style={{
+              fontFamily: 'DM Mono, monospace', fontSize: '28px',
+              fontWeight: 400, color: 'var(--gold)', lineHeight: 1,
+            }}>
+              {finalScore}
+            </div>
+            <div style={{
+              fontSize: '10px', fontWeight: 600, color: 'var(--gold)',
+              marginTop: '2px', fontFamily: 'DM Mono, monospace',
+              letterSpacing: '.06em', textTransform: 'uppercase',
+            }}>
+              {grade}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 4-stat bar */}
+      {/* Stats bar */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr',
-        borderBottom: '1px solid var(--border)',
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+        margin: '16px 24px 0',
+        background: 'var(--ink2)',
+        border: '1px solid var(--border2)',
+        borderRadius: 'var(--r2)',
+        overflow: 'hidden',
       }}>
         <KpiCard
           label="Total return"
           value={`${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
           sub={`₹${Math.round(totalValue).toLocaleString('en-IN')}`}
-          variant={totalReturn >= 0 ? 'up' : 'down'}
+          variant={totalReturn >= 0 ? 'up' : 'down'} delay={0}
         />
         <KpiCard label="Cash balance"
           value={`₹${Math.round(portfolioData?.cash_balance || 100000).toLocaleString('en-IN')}`}
-          sub="available" variant="default"
+          sub="available" variant="default" delay={0.05}
         />
-        <KpiCard label="Max drawdown" value="—" sub="—" variant="default" />
-        <KpiCard label="Win rate" value="—" sub="—" variant="default" />
+        <KpiCard label="Max drawdown" value="—" sub="—" variant="default" delay={0.1} />
+        <KpiCard label="Win rate" value="—" sub="—" variant="default" delay={0.15} />
       </div>
 
       {/* Score breakdown */}
-      <div style={{ borderBottom: '1px solid var(--border)' }}>
+      <div style={{
+        margin: '16px 24px 0',
+        background: 'var(--ink2)',
+        border: '1px solid var(--border2)',
+        borderRadius: 'var(--r2)',
+        overflow: 'hidden',
+      }}>
         <TraderScoreCard score={finalScore} grade={grade} breakdown={animatedScores} />
       </div>
 
       {/* Season history */}
-      <SeasonHistory seasons={DEMO_SEASONS} />
+      <div style={{
+        margin: '16px 24px 24px',
+        background: 'var(--ink2)',
+        border: '1px solid var(--border2)',
+        borderRadius: 'var(--r2)',
+        overflow: 'hidden',
+      }}>
+        <SeasonHistory seasons={DEMO_SEASONS} />
+      </div>
     </div>
   );
 }

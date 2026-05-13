@@ -3,7 +3,7 @@ import { useState } from 'react';
 import './AuthScreen.css';
 
 export function AuthScreen({ onAuth, error, clearError }) {
-  const [mode, setMode] = useState('login');  // 'login' or 'register'
+  const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,33 +58,36 @@ export function AuthScreen({ onAuth, error, clearError }) {
       <div className="auth-card">
         {/* Logo */}
         <div className="auth-logo">
-          nse<span className="gold">arena</span>
+          <div className="auth-logo-icon">N</div>
+          <div className="auth-logo-text">
+            NSE <span className="gold">Arena</span>
+          </div>
         </div>
         <div className="auth-subtitle">
-          Paper trading competition for Indian markets
+          Master the markets. Zero real risk.
         </div>
 
-        {/* Login / Register tabs */}
+        {/* Tabs */}
         <div className="auth-tabs">
           <button
             className={`auth-tab ${mode === 'login' ? 'active' : ''}`}
             onClick={() => switchMode('login')}
             type="button"
           >
-            Login
+            Sign In
           </button>
           <button
             className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
             onClick={() => switchMode('register')}
             type="button"
           >
-            Register
+            Create Account
           </button>
         </div>
 
         {/* Error */}
         {displayError && (
-          <div className="auth-error">{displayError}</div>
+          <div className="auth-error">⚠ {displayError}</div>
         )}
 
         {/* Form */}
@@ -96,7 +99,7 @@ export function AuthScreen({ onAuth, error, clearError }) {
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="e.g. SharpeEdge"
+              placeholder="your_trader_name"
               autoComplete="username"
               autoFocus
             />
@@ -137,9 +140,16 @@ export function AuthScreen({ onAuth, error, clearError }) {
           </button>
         </form>
 
-        {/* Footer */}
+        {/* Feature chips footer */}
         <div className="auth-footer">
-          Start with <span>₹1,00,000</span> virtual capital · Compete in seasonal leaderboards
+          <div className="auth-features">
+            <span className="auth-feature-chip">
+              <span className="mono">₹1,00,000</span> virtual capital
+            </span>
+            <span className="auth-feature-chip">📡 Live NSE data</span>
+            <span className="auth-feature-chip">🤖 AI competitors</span>
+            <span className="auth-feature-chip">🏆 Seasonal leagues</span>
+          </div>
         </div>
       </div>
     </div>

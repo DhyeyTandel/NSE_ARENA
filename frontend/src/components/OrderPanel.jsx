@@ -6,8 +6,8 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
   const [symbol, setSymbol] = useState(defaultSymbol);
   const [price, setPrice] = useState(livePrice || 2847.30);
   const [qty, setQty] = useState(10);
+  const [showFees, setShowFees] = useState(false);
 
-  // Update price when live data arrives
   useEffect(() => {
     if (livePrice && livePrice > 0) {
       setPrice(livePrice);
@@ -23,10 +23,16 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
   const totalFees = stt + brokerage + exchangeCharge + sebi + gst;
 
   const inputStyle = {
-    background: 'var(--ink2)', border: '1px solid var(--border2)',
-    borderRadius: 'var(--r)', padding: '7px 9px', color: 'var(--text)',
-    fontSize: '12px', fontFamily: 'DM Mono, monospace',
-    outline: 'none', width: '100%'
+    background: 'var(--ink)',
+    border: '1px solid var(--border2)',
+    borderRadius: 'var(--r)',
+    padding: '10px 12px',
+    color: 'var(--text)',
+    fontSize: '13px',
+    fontFamily: 'DM Mono, monospace',
+    outline: 'none',
+    width: '100%',
+    transition: 'border-color 0.2s var(--ease), box-shadow 0.2s var(--ease)',
   };
 
   const handleSubmit = () => {
@@ -41,100 +47,212 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
     }
   };
 
+  const isBuy = side === 'buy';
+
   return (
-    <div style={{ padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{
+      padding: '20px 18px',
+      display: 'flex', flexDirection: 'column', gap: '16px',
+      animation: 'fadeIn 0.4s var(--ease)',
+    }}>
+
+      {/* Header */}
+      <div style={{
+        fontSize: '13px', fontWeight: 600, color: 'var(--text)',
+        letterSpacing: '-0.2px',
+        display: 'flex', alignItems: 'center', gap: '8px',
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
+          <path d="M12 18V6"/>
+        </svg>
+        Place Order
+        <span style={{
+          fontSize: '10px', fontWeight: 500,
+          color: 'var(--text3)', background: 'var(--ink3)',
+          padding: '2px 8px', borderRadius: 'var(--r4)',
+          marginLeft: 'auto',
+        }}>
+          Market
+        </span>
+      </div>
 
       {/* Symbol input */}
       <input
         value={symbol}
         onChange={e => setSymbol(e.target.value.toUpperCase())}
         style={{
-          ...inputStyle, fontSize: '20px', fontWeight: 300,
-          letterSpacing: '-.5px', border: 'none', borderBottom: '1px solid var(--border3)',
-          borderRadius: 0, padding: '0 0 8px 0', background: 'none'
+          ...inputStyle,
+          fontSize: '22px', fontWeight: 500, fontFamily: 'Inter, sans-serif',
+          letterSpacing: '-0.5px',
+          border: 'none',
+          borderBottom: '2px solid var(--border3)',
+          borderRadius: 0,
+          padding: '0 0 10px 0',
+          background: 'none',
         }}
         placeholder="SYMBOL"
       />
 
       {/* Buy / Sell toggle */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr',
-        border: '1px solid var(--border2)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr',
+        borderRadius: 'var(--r)',
+        overflow: 'hidden',
+        border: '1px solid var(--border2)',
+      }}>
         {['buy', 'sell'].map(s => (
           <button key={s} onClick={() => setSide(s)}
             style={{
-              padding: '8px', fontSize: '11px', fontWeight: 500,
-              letterSpacing: '.04em', textTransform: 'uppercase',
-              cursor: 'pointer', border: 'none', fontFamily: 'Geist, sans-serif',
+              padding: '10px', fontSize: '12px', fontWeight: 600,
+              letterSpacing: '.06em', textTransform: 'uppercase',
+              cursor: 'pointer', border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               background: side === s
                 ? (s === 'buy' ? 'var(--up)' : 'var(--dn)')
-                : 'none',
+                : 'var(--ink3)',
               color: side === s
-                ? (s === 'buy' ? '#000' : '#fff')
+                ? '#000'
                 : 'var(--text3)',
-              transition: '.12s'
+              transition: 'all 0.2s var(--ease)',
             }}>
-            {s}
+            {s === 'buy' ? '↑' : '↓'} {s}
           </button>
         ))}
       </div>
 
       {/* Fields */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         {[
-          { label: 'Price ₹', value: price, setter: setPrice, type: 'number' },
-          { label: 'Qty', value: qty, setter: setQty, type: 'number' }
-        ].map(({ label, value, setter, type }) => (
-          <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '10px', color: 'var(--text3)',
-              textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          { label: 'Price ₹', value: price, setter: setPrice },
+          { label: 'Quantity', value: qty, setter: setQty }
+        ].map(({ label, value, setter }) => (
+          <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <label style={{
+              fontSize: '11px', fontWeight: 500, color: 'var(--text3)',
+              textTransform: 'uppercase', letterSpacing: '.08em',
+            }}>
               {label}
             </label>
-            <input type={type} value={value}
+            <input
+              type="number"
+              value={value}
               onChange={e => setter(parseFloat(e.target.value) || 0)}
-              style={inputStyle} />
+              style={inputStyle}
+              onFocus={e => {
+                e.target.style.borderColor = isBuy ? 'var(--up-glow)' : 'var(--dn-glow)';
+                e.target.style.boxShadow = `0 0 0 3px ${isBuy ? 'var(--up-dim)' : 'var(--dn-dim)'}`;
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = 'var(--border2)';
+                e.target.style.boxShadow = 'none';
+              }}
+            />
           </div>
         ))}
       </div>
 
-      {/* Fee breakdown */}
-      <div style={{ background: 'var(--ink2)', borderRadius: 'var(--r)',
-        padding: '10px 12px', border: '1px solid var(--border)' }}>
-        {[
-          { label: 'Trade value', value: `₹${Math.round(tradeValue).toLocaleString('en-IN')}` },
-          { label: 'STT', value: `₹${stt.toFixed(2)}` },
-          { label: 'Brokerage + GST', value: `₹${(brokerage + exchangeCharge + sebi + gst).toFixed(2)}` },
-          { label: 'Total charges', value: `₹${totalFees.toFixed(2)}`, strong: true },
-        ].map(({ label, value, strong }) => (
-          <div key={label} style={{
-            display: 'flex', justifyContent: 'space-between',
-            fontSize: '11px', fontFamily: 'DM Mono, monospace',
-            color: strong ? 'var(--text2)' : 'var(--text3)',
-            marginBottom: strong ? 0 : '4px',
-            paddingTop: strong ? '6px' : 0,
-            borderTop: strong ? '1px solid var(--border)' : 'none'
+      {/* Trade value */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '10px 14px',
+        background: 'var(--ink)', borderRadius: 'var(--r)',
+        border: '1px solid var(--border)',
+      }}>
+        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Trade value</span>
+        <span style={{
+          fontFamily: 'DM Mono, monospace', fontSize: '14px',
+          fontWeight: 500, color: 'var(--text)',
+        }}>
+          ₹{Math.round(tradeValue).toLocaleString('en-IN')}
+        </span>
+      </div>
+
+      {/* Fee breakdown — collapsible */}
+      <div>
+        <button
+          onClick={() => setShowFees(!showFees)}
+          style={{
+            width: '100%', padding: '8px 12px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: 'none', border: 'none',
+            fontSize: '11px', color: 'var(--text3)',
+            cursor: 'pointer',
+          }}
+        >
+          <span>Charges & taxes</span>
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            fontFamily: 'DM Mono, monospace',
           }}>
-            <span>{label}</span><span>{value}</span>
+            ₹{totalFees.toFixed(2)}
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              style={{
+                transform: showFees ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s var(--ease)',
+              }}
+            >
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </span>
+        </button>
+        {showFees && (
+          <div style={{
+            padding: '8px 12px',
+            background: 'var(--ink)', borderRadius: 'var(--r)',
+            border: '1px solid var(--border)',
+            animation: 'fadeIn 0.2s var(--ease)',
+          }}>
+            {[
+              { label: 'STT', value: `₹${stt.toFixed(2)}` },
+              { label: 'Brokerage', value: `₹${brokerage.toFixed(2)}` },
+              { label: 'Exchange charges', value: `₹${exchangeCharge.toFixed(2)}` },
+              { label: 'GST', value: `₹${gst.toFixed(2)}` },
+            ].map(({ label, value }) => (
+              <div key={label} style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: '11px', fontFamily: 'DM Mono, monospace',
+                color: 'var(--text3)', marginBottom: '3px',
+              }}>
+                <span>{label}</span><span>{value}</span>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
       {/* Submit */}
-      <button onClick={handleSubmit} disabled={!authenticated} style={{
-        width: '100%', padding: '10px', borderRadius: 'var(--r)',
-        border: 'none', fontSize: '12px', fontWeight: 500,
-        letterSpacing: '.04em', textTransform: 'uppercase',
-        cursor: authenticated ? 'pointer' : 'not-allowed',
-        fontFamily: 'Geist, sans-serif',
-        background: !authenticated ? 'var(--ink3)'
-          : side === 'buy' ? 'var(--up)' : 'var(--dn)',
-        color: !authenticated ? 'var(--text3)'
-          : side === 'buy' ? '#000' : '#fff',
-        transition: '.12s',
-        opacity: authenticated ? 1 : 0.7,
-      }}>
+      <button
+        onClick={handleSubmit}
+        disabled={!authenticated}
+        style={{
+          width: '100%', padding: '12px', borderRadius: 'var(--r)',
+          border: 'none', fontSize: '13px', fontWeight: 600,
+          letterSpacing: '.04em', textTransform: 'uppercase',
+          cursor: authenticated ? 'pointer' : 'not-allowed',
+          background: !authenticated ? 'var(--ink3)'
+            : isBuy
+              ? 'linear-gradient(135deg, var(--up) 0%, #1ab370 100%)'
+              : 'linear-gradient(135deg, var(--dn) 0%, #d63030 100%)',
+          color: !authenticated ? 'var(--text3)' : '#000',
+          transition: 'all 0.2s var(--ease)',
+          opacity: authenticated ? 1 : 0.6,
+          boxShadow: authenticated
+            ? (isBuy ? '0 4px 16px var(--up-dim)' : '0 4px 16px var(--dn-dim)')
+            : 'none',
+        }}
+        onMouseEnter={e => {
+          if (authenticated) e.target.style.transform = 'translateY(-1px)';
+        }}
+        onMouseLeave={e => {
+          if (authenticated) e.target.style.transform = 'translateY(0)';
+        }}
+      >
         {authenticated
-          ? (side === 'buy' ? 'Buy' : 'Sell') + ' ' + symbol
-          : 'Login to trade'}
+          ? (isBuy ? '↑ Buy' : '↓ Sell') + ' ' + symbol
+          : '🔒 Sign in to trade'}
       </button>
     </div>
   );

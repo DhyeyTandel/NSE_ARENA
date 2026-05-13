@@ -21,29 +21,46 @@ function App() {
     }
   };
 
-  // Show loading spinner while validating stored token
+  // Loading state — branded spinner
   if (loading) {
     return (
       <div style={{
         minHeight: '100vh',
         background: 'var(--ink)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: '16px',
       }}>
         <div style={{
-          fontSize: '16px',
-          fontWeight: 500,
-          color: 'var(--text3)',
+          width: '40px', height: '40px', borderRadius: '10px',
+          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-solid) 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '20px', fontWeight: 800, color: '#000',
+          animation: 'glowPulse 1.5s ease-in-out infinite',
+          boxShadow: 'var(--shadow-gold)',
+        }}>
+          N
+        </div>
+        <div style={{
+          fontSize: '15px', fontWeight: 600, color: 'var(--text)',
           letterSpacing: '-0.3px',
         }}>
-          nse<span style={{ color: 'var(--gold)' }}>arena</span>
+          NSE <span style={{ color: 'var(--gold)' }}>Arena</span>
         </div>
+        <div style={{
+          width: '24px', height: '24px',
+          border: '2px solid var(--border2)',
+          borderTopColor: 'var(--gold)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
       </div>
     );
   }
 
-  // Not authenticated — show login/register screen
+  // Not authenticated
   if (!token || !user) {
     return (
       <AuthScreen
@@ -54,7 +71,7 @@ function App() {
     );
   }
 
-  // Authenticated — show main app
+  // Authenticated
   const renderScreen = () => {
     switch (activeScreen) {
       case 'dashboard':
@@ -84,7 +101,10 @@ function App() {
         user={user}
         onLogout={logout}
       />
-      <main>
+      <main style={{
+        maxWidth: '1440px',
+        margin: '0 auto',
+      }}>
         {renderScreen()}
       </main>
     </div>
