@@ -22,9 +22,9 @@ function getGreeting() {
   return 'Good evening';
 }
 
-export function Dashboard({ token, user }) {
+export function Dashboard({ authenticated, user }) {
   const [selectedTicker, setSelectedTicker] = useState('RELIANCE');
-  const { portfolio, refetch: refetchPortfolio } = usePortfolio(token);
+  const { portfolio, refetch: refetchPortfolio } = usePortfolio(authenticated);
 
   const positions = useMemo(() => {
     if (portfolio?.holdings?.length > 0) return portfolio.holdings;
@@ -32,7 +32,7 @@ export function Dashboard({ token, user }) {
   }, [portfolio]);
 
   const startingCapital = portfolio?.starting_capital || 100000;
-  const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL, token);
+  const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL, authenticated);
 
   const portfolioStats = useMemo(() => {
     if (portfolio) {
@@ -63,11 +63,12 @@ export function Dashboard({ token, user }) {
   const displayChangePct = selectedLivePrice?.change_pct || 1.55;
 
   const handleSubmit = async (order) => {
-    if (!token) return;
+    if (!authenticated) return;
     try {
       const response = await fetch('http://localhost:8000/trades', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify(order),
       });
       if (response.ok) {
@@ -198,7 +199,7 @@ export function Dashboard({ token, user }) {
             defaultSymbol={selectedTicker}
             onSubmit={handleSubmit}
             livePrice={displayPrice}
-            authenticated={!!token}
+            authenticated={authenticated}
           />
         </div>
       </div>

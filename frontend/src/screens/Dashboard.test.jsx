@@ -14,7 +14,7 @@ import { Dashboard } from './Dashboard';
 
 describe('Dashboard', () => {
   it('renders all 4 KPI card labels', () => {
-    render(<Dashboard token={null} />);
+    render(<Dashboard authenticated={false} />);
 
     expect(screen.getByText('Portfolio value')).toBeTruthy();
     expect(screen.getByText("Today's P&L")).toBeTruthy();
@@ -23,14 +23,14 @@ describe('Dashboard', () => {
   });
 
   it('renders the selected ticker name', () => {
-    render(<Dashboard token={null} />);
+    render(<Dashboard authenticated={false} />);
     // "RELIANCE" appears in both the ticker label and the mocked PriceChart
     const matches = screen.getAllByText('RELIANCE');
     expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders demo positions in the table', () => {
-    render(<Dashboard token={null} />);
+    render(<Dashboard authenticated={false} />);
 
     // Demo positions from Dashboard.jsx
     expect(screen.getByText('TCS')).toBeTruthy();

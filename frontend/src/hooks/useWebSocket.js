@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 
-export function useWebSocket(url, token) {
+export function useWebSocket(url, enabled) {
   const [prices, setPrices] = useState({});
   const [connected, setConnected] = useState(false);
   const ws = useRef(null);
@@ -17,9 +17,9 @@ export function useWebSocket(url, token) {
       ws.current.close();
     }
 
-    // The server requires a valid JWT as the first message frame, so
-    // there's no point connecting without one.
-    if (!token) {
+    // The server authenticates the handshake via the httpOnly auth
+    // cookie, so only connect once logged in.
+    if (!enabled) {
       return;
     }
 
@@ -31,7 +31,6 @@ export function useWebSocket(url, token) {
     }
 
     ws.current.onopen = () => {
-      ws.current.send(JSON.stringify({ token }));
       setConnected(true);
       reconnectAttempt.current = 0;
     };
@@ -56,7 +55,7 @@ export function useWebSocket(url, token) {
     ws.current.onerror = () => {
       setConnected(false);
     };
-  }, [url, token]);
+  }, [url, enabled]);
 
   const scheduleReconnect = useCallback(() => {
     // Exponential backoff: 3s → 6s → 12s → 24s → 30s (capped)

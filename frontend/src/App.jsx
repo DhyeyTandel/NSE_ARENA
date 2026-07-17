@@ -11,7 +11,7 @@ import { ScriptEditor } from './screens/ScriptEditor';
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('dashboard');
-  const { token, user, loading, error, login, register, logout, clearError } = useAuth();
+  const { authenticated, user, loading, error, login, register, logout, clearError } = useAuth();
 
   const handleAuth = async (mode, data) => {
     if (mode === 'login') {
@@ -61,7 +61,7 @@ function App() {
   }
 
   // Not authenticated
-  if (!token || !user) {
+  if (!authenticated || !user) {
     return (
       <AuthScreen
         onAuth={handleAuth}
@@ -75,17 +75,17 @@ function App() {
   const renderScreen = () => {
     switch (activeScreen) {
       case 'dashboard':
-        return <Dashboard token={token} user={user} />;
+        return <Dashboard authenticated={authenticated} user={user} />;
       case 'leaderboard':
-        return <Leaderboard token={token} />;
+        return <Leaderboard />;
       case 'ai-feed':
         return <AIFeed />;
       case 'scripts':
-        return <ScriptEditor token={token} />;
+        return <ScriptEditor authenticated={authenticated} />;
       case 'profile':
-        return <Profile token={token} user={user} />;
+        return <Profile authenticated={authenticated} user={user} />;
       default:
-        return <Dashboard token={token} user={user} />;
+        return <Dashboard authenticated={authenticated} user={user} />;
     }
   };
 

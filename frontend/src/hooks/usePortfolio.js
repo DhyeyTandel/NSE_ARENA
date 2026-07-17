@@ -4,20 +4,20 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
 
-export function usePortfolio(token) {
+export function usePortfolio(authenticated) {
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchPortfolio = async () => {
-    if (!token) {
+    if (!authenticated) {
       setLoading(false);
       return;
     }
 
     try {
       const response = await axios.get(`${API_URL}/portfolio`, {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true,
       });
       setPortfolio(response.data);
       setError(null);
@@ -30,7 +30,7 @@ export function usePortfolio(token) {
 
   useEffect(() => {
     fetchPortfolio();
-  }, [token]);
+  }, [authenticated]);
 
   return { portfolio, loading, error, refetch: fetchPortfolio };
 }

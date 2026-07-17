@@ -10,7 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from database import async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
 from api.dependencies import get_current_user_optional, get_current_user
 from api.rate_limit import check_rate_limit
 from market_data.fetcher import MarketDataFetcher
@@ -257,45 +259,45 @@ async def get_templates():
 
 @router.post("/save")
 async def save_script(req: SaveScriptRequest,
-                      user=Depends(get_current_user)):
+                      user=Depends(get_current_user),
+                      db: AsyncSession = Depends(get_db)):
     """Save a user's script."""
     from db.models import UserScript
 
-    async with async_session() as db:
-        script = UserScript(
-            user_id=user.id,
-            name=req.name,
-            code=req.code,
-        )
-        db.add(script)
-        await db.commit()
-        await db.refresh(script)
-        return {
-            "id": script.id,
-            "name": script.name,
-            "created_at": str(script.created_at),
-        }
+    script = UserScript(
+        user_id=user.id,
+        name=req.name,
+        code=req.code,
+    )
+    db.add(script)
+    await db.commit()
+    await db.refresh(script)
+    return {
+        "id": script.id,
+        "name": script.name,
+        "created_at": str(script.created_at),
+    }
 
 
 @router.get("/mine")
-async def get_my_scripts(user=Depends(get_current_user)):
+async def get_my_scripts(user=Depends(get_current_user),
+                         db: AsyncSession = Depends(get_db)):
     """Get all scripts saved by the current user."""
     from db.models import UserScript
 
-    async with async_session() as db:
-        result = await db.execute(
-            select(UserScript)
-            .where(UserScript.user_id == user.id)
-            .order_by(UserScript.updated_at.desc())
-        )
-        scripts = result.scalars().all()
-        return [
-            {
-                "id": s.id,
-                "name": s.name,
-                "code": s.code,
-                "created_at": str(s.created_at),
-                "updated_at": str(s.updated_at),
-            }
-            for s in scripts
-        ]
+    result = await db.execute(
+        select(UserScript)
+        .where(UserScript.user_id == user.id)
+        .order_by(UserScript.updated_at.desc())
+    )
+    scripts = result.scalars().all()
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "code": s.code,
+            "created_at": str(s.created_at),
+            "updated_at": str(s.updated_at),
+        }
+        for s in scripts
+    ]

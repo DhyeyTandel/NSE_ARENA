@@ -1,5 +1,5 @@
 # api/routes/auth.py
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,12 +11,27 @@ from typing import Optional
 
 from database import get_db
 from db.models import User, Portfolio, Season
-from api.dependencies import get_current_user
+from api.dependencies import get_current_user, AUTH_COOKIE_NAME
 from api.rate_limit import check_rate_limit, client_ip
+import config
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, STARTING_CAPITAL
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    """httpOnly auth cookie for browser clients. Secure only in production
+    because Safari refuses Secure cookies over plain-http localhost dev."""
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=config.ENV == "production",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
 
 
 class RegisterRequest(BaseModel):
@@ -44,7 +59,8 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(request: RegisterRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+async def register(request: RegisterRequest, http_request: Request, response: Response,
+                   db: AsyncSession = Depends(get_db)):
     await check_rate_limit(
         http_request, bucket="register", identity=client_ip(http_request),
         limit=3, window_seconds=3600
@@ -85,12 +101,14 @@ async def register(request: RegisterRequest, http_request: Request, db: AsyncSes
     await db.commit()
 
     token = create_access_token(data={"sub": str(user.id)})
+    set_auth_cookie(response, token)
     user_info = _user_to_dict(user)
     return TokenResponse(access_token=token, user=user_info)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(http_request: Request,
+                response: Response,
                 form_data: OAuth2PasswordRequestForm = Depends(),
                 db: AsyncSession = Depends(get_db)):
     await check_rate_limit(
@@ -109,11 +127,13 @@ async def login(http_request: Request,
         )
 
     token = create_access_token(data={"sub": str(user.id)})
+    set_auth_cookie(response, token)
     return TokenResponse(access_token=token)
 
 
 @router.post("/login/json", response_model=TokenResponse)
-async def login_json(request: LoginRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+async def login_json(request: LoginRequest, http_request: Request, response: Response,
+                     db: AsyncSession = Depends(get_db)):
     """JSON-body login alternative (used by the frontend)"""
     # Same "login" bucket as /auth/login — otherwise an attacker just
     # switches endpoints to dodge the limit.
@@ -132,8 +152,18 @@ async def login_json(request: LoginRequest, http_request: Request, db: AsyncSess
         )
 
     token = create_access_token(data={"sub": str(user.id)})
+    set_auth_cookie(response, token)
     user_info = _user_to_dict(user)
     return TokenResponse(access_token=token, user=user_info)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Clear the httpOnly auth cookie. No CSRF/auth requirement — logging
+    someone out is not a damaging action and requiring auth would strand
+    clients holding an expired token."""
+    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+    return {"status": "logged out"}
 
 
 @router.get("/me")

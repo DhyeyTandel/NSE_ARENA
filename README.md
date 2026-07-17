@@ -268,6 +268,26 @@ sellSignal = ta.crossunder(fast, slow)
 
 ---
 
+## 🔐 Auth Model
+
+JWTs are delivered to browsers in an **httpOnly, SameSite=Lax cookie**
+(`Secure` in production) set by `/auth/login`, `/auth/login/json`, and
+`/auth/register` — never stored in `localStorage`, so an XSS payload
+cannot read the token. `POST /auth/logout` clears the cookie.
+
+- Cookie-authenticated **mutating** requests must send
+  `X-Requested-With: XMLHttpRequest` (CSRF guard — a cross-site form can
+  make the browser send the cookie, but can't set a custom header).
+- API clients and tests can instead pass `Authorization: Bearer <token>`
+  (the login/register responses still return `access_token` in the body);
+  Bearer auth skips the CSRF header requirement since it can't be forged
+  cross-site.
+- The `/ws/prices` WebSocket authenticates the handshake with the same
+  cookie; non-browser clients may instead send `{"token": "<jwt>"}` as
+  the first message frame within 5 seconds.
+
+---
+
 ## ⚙️ Environment Variables
 
 See [`backend/.env.example`](backend/.env.example) for the full list with comments.

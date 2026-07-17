@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 
+from api.dependencies import AUTH_COOKIE_NAME
 from config import SECRET_KEY, ALGORITHM
 
 logger = logging.getLogger(__name__)
@@ -28,19 +29,29 @@ def _client_ip(websocket: WebSocket) -> str:
     return websocket.client.host if websocket.client else "unknown"
 
 
+def _valid_token(token: str) -> bool:
+    try:
+        claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return bool(claims.get("sub"))
+    except JWTError:
+        return False
+
+
 async def _authenticate(websocket: WebSocket) -> bool:
-    """Require a valid JWT sent as the first message frame (not a query
-    param, since query params end up in access logs). Closes with 4401
-    on timeout, malformed payload, or an invalid/expired token."""
+    """Browser clients authenticate via the httpOnly auth cookie sent with
+    the handshake. Non-browser clients may instead send a valid JWT as the
+    first message frame (not a query param, since query params end up in
+    access logs). Closes with 4401 on timeout, malformed payload, or an
+    invalid/expired token."""
+    cookie_token = websocket.cookies.get(AUTH_COOKIE_NAME)
+    if cookie_token and _valid_token(cookie_token):
+        return True
+
     try:
         raw = await asyncio.wait_for(websocket.receive_text(), timeout=AUTH_TIMEOUT_SECONDS)
         payload = json.loads(raw)
-        token = payload.get("token", "")
-        claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if not claims.get("sub"):
-            raise ValueError("token missing sub claim")
-        return True
-    except (asyncio.TimeoutError, JWTError, ValueError, json.JSONDecodeError, WebSocketDisconnect):
+        return _valid_token(payload.get("token", ""))
+    except (asyncio.TimeoutError, ValueError, json.JSONDecodeError, WebSocketDisconnect):
         return False
 
 

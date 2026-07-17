@@ -3,52 +3,46 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
-const TOKEN_KEY = 'nse_arena_token';
+
+// Auth lives in an httpOnly cookie set by the backend — JS never sees the
+// token (closes the XSS-token-theft hole of localStorage). Every request
+// needs credentials so the browser attaches the cookie, and mutating
+// requests need X-Requested-With as the CSRF guard the backend enforces.
+const api = axios.create({
+  baseURL: API_URL,
+  withCredentials: true,
+  headers: { 'X-Requested-With': 'XMLHttpRequest' },
+});
 
 export function useAuth() {
-  const [token, setToken] = useState(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // On mount: restore token from localStorage and validate
+  // On mount: the cookie (if present) authenticates /auth/me
   useEffect(() => {
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      validateToken(stored);
-    } else {
-      setLoading(false);
-    }
+    const restoreSession = async () => {
+      try {
+        const response = await api.get('/auth/me');
+        setAuthenticated(true);
+        setUser(response.data);
+      } catch {
+        setAuthenticated(false);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    restoreSession();
   }, []);
-
-  const validateToken = async (tkn) => {
-    try {
-      const response = await axios.get(`${API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${tkn}` },
-      });
-      setToken(tkn);
-      setUser(response.data);
-    } catch {
-      // Token expired or invalid — clear it
-      localStorage.removeItem(TOKEN_KEY);
-      setToken(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const login = useCallback(async (username, password) => {
     setError(null);
     try {
-      const response = await axios.post(`${API_URL}/auth/login/json`, {
-        username,
-        password,
-      });
-      const { access_token, user: userData } = response.data;
-      localStorage.setItem(TOKEN_KEY, access_token);
-      setToken(access_token);
-      setUser(userData);
+      const response = await api.post('/auth/login/json', { username, password });
+      setAuthenticated(true);
+      setUser(response.data.user);
       return true;
     } catch (err) {
       const detail = err.response?.data?.detail || 'Login failed';
@@ -60,15 +54,9 @@ export function useAuth() {
   const register = useCallback(async (username, email, password) => {
     setError(null);
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, {
-        username,
-        email,
-        password,
-      });
-      const { access_token, user: userData } = response.data;
-      localStorage.setItem(TOKEN_KEY, access_token);
-      setToken(access_token);
-      setUser(userData);
+      const response = await api.post('/auth/register', { username, email, password });
+      setAuthenticated(true);
+      setUser(response.data.user);
       return true;
     } catch (err) {
       const detail = err.response?.data?.detail || 'Registration failed';
@@ -77,13 +65,17 @@ export function useAuth() {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken(null);
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Cookie clearing failed server-side; still drop local state
+    }
+    setAuthenticated(false);
     setUser(null);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
 
-  return { token, user, loading, error, login, register, logout, clearError };
+  return { authenticated, user, loading, error, login, register, logout, clearError };
 }

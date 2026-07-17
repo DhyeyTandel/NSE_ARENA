@@ -13,7 +13,7 @@ const DEMO_BREAKDOWN = [
 
 const DEMO_SEASONS = [];
 
-export function Profile({ token, user }) {
+export function Profile({ authenticated, user }) {
   const [scoreData, setScoreData] = useState(null);
   const [portfolioData, setPortfolioData] = useState(null);
   const [animatedScores, setAnimatedScores] = useState(
@@ -23,7 +23,7 @@ export function Profile({ token, user }) {
   const displayUser = user || { username: 'DhyeyTrader', initials: 'DT' };
 
   useEffect(() => {
-    if (!token || !user) return;
+    if (!authenticated || !user) return;
     const fetchScore = async () => {
       try {
         const response = await fetch(`http://localhost:8000/score/${user.id}`);
@@ -33,14 +33,14 @@ export function Profile({ token, user }) {
     const fetchPortfolio = async () => {
       try {
         const response = await fetch('http://localhost:8000/portfolio', {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         });
         if (response.ok) setPortfolioData(await response.json());
       } catch { /* Use defaults */ }
     };
     fetchScore();
     fetchPortfolio();
-  }, [token, user]);
+  }, [authenticated, user]);
 
   const breakdown = scoreData ? [
     { key: 'returns', label: 'Returns', weight: 30, score: scoreData.breakdown.returns_score },

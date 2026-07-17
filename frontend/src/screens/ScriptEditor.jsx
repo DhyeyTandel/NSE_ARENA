@@ -29,7 +29,7 @@ hline(50, title="Midline", color=color.gray)
 
 const PERIODS = ['1mo', '3mo', '6mo', '1y'];
 
-export function ScriptEditor({ token }) {
+export function ScriptEditor({ authenticated }) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [ticker, setTicker] = useState('RELIANCE');
   const [period, setPeriod] = useState('3mo');
@@ -93,7 +93,8 @@ export function ScriptEditor({ token }) {
     try {
       const res = await fetch(`${API}/api/scripts/run`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ code, ticker, period }),
       });
 
@@ -145,7 +146,7 @@ export function ScriptEditor({ token }) {
 
   // Save script
   const handleSave = useCallback(async () => {
-    if (!token) {
+    if (!authenticated) {
       setConsoleLogs(prev => [...prev,
         { type: 'error', text: 'Login required to save scripts.' },
       ]);
@@ -158,9 +159,10 @@ export function ScriptEditor({ token }) {
     try {
       const res = await fetch(`${API}/api/scripts/save`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify({ name, code }),
       });
@@ -179,7 +181,7 @@ export function ScriptEditor({ token }) {
         { type: 'error', text: 'Network error — could not save.' },
       ]);
     }
-  }, [code, token]);
+  }, [code, authenticated]);
 
   // Keyboard shortcut: Ctrl/Cmd + Enter to run
   useEffect(() => {

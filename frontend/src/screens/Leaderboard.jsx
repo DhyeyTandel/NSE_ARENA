@@ -12,7 +12,7 @@ const DEMO_LEADERBOARD = [
   { rank: 7, trader: { name: 'RetailRider', initials: 'RR', tag: '42 trades · 14d active' }, score: 421, grade: 'Beginner', returnPct: '-0.8%', drawdown: '-12.3%', value: '₹99,200', isYou: false, isAI: false },
 ];
 
-export function Leaderboard({ token }) {
+export function Leaderboard() {
   const [entries, setEntries] = useState(DEMO_LEADERBOARD);
   const [season, setSeason] = useState(null);
   const [hasRealData, setHasRealData] = useState(false);
@@ -45,7 +45,7 @@ export function Leaderboard({ token }) {
       } catch { /* Use demo data */ }
     };
     fetchData();
-  }, [token]);
+  }, []);
 
   const seasonName = season?.name || 'Season 3';
   const seasonInfo = season ? `${entries.length} traders · ${season.days_remaining} days remaining` : '47 traders · 14 days remaining';
