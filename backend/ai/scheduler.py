@@ -3,6 +3,7 @@
 AI Agent Scheduler — runs the AI trading bot on a cron schedule
 during Indian market hours (9:15 AM – 3:30 PM IST, Mon–Fri).
 """
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -145,7 +146,7 @@ class AIScheduler:
                 market_data = {}
                 for ticker in AI_WATCHLIST:
                     try:
-                        price = MarketDataFetcher.get_price(ticker)
+                        price = await asyncio.to_thread(MarketDataFetcher.get_price, ticker)
                         market_data[ticker] = price
                     except Exception:
                         pass

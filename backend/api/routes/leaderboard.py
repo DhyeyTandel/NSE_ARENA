@@ -1,5 +1,7 @@
 # api/routes/leaderboard.py
-from fastapi import APIRouter, Depends
+import asyncio
+
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -10,8 +12,19 @@ from market_data.fetcher import MarketDataFetcher
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
+async def _price_or_fallback(broadcaster, ticker: str, fallback: float) -> float:
+    cached = await broadcaster.get_cached_price(ticker)
+    if cached:
+        return cached.get("price", fallback)
+    try:
+        price_data = await asyncio.to_thread(MarketDataFetcher.get_price, ticker)
+        return price_data.get("price", fallback)
+    except Exception:
+        return fallback
+
+
 @router.get("")
-async def get_leaderboard(db: AsyncSession = Depends(get_db)):
+async def get_leaderboard(request: Request, db: AsyncSession = Depends(get_db)):
     # Get active season
     season_result = await db.execute(select(Season).where(Season.is_active == True))
     season = season_result.scalar_one_or_none()
@@ -34,16 +47,15 @@ async def get_leaderboard(db: AsyncSession = Depends(get_db)):
         )
         positions = positions_result.scalars().all()
 
-        # Calculate total value
+        # Calculate total value (cache-first, threaded fallback — never a
+        # blocking yfinance call on the event loop)
+        broadcaster = request.app.state.broadcaster
         holdings_value = 0.0
         for pos in positions:
             if pos.quantity <= 0:
                 continue
-            try:
-                price_data = MarketDataFetcher.get_price(pos.ticker)
-                holdings_value += price_data["price"] * pos.quantity
-            except Exception:
-                holdings_value += pos.avg_price * pos.quantity
+            price = await _price_or_fallback(broadcaster, pos.ticker, pos.avg_price)
+            holdings_value += price * pos.quantity
 
         total_value = portfolio.cash_balance + holdings_value
         total_return_pct = ((total_value - season.starting_capital) / season.starting_capital * 100)
