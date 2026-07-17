@@ -1,14 +1,29 @@
 # docker-compose.yml
 version: "3.8"
 services:
+  caddy:
+    image: caddy:2-alpine
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   backend:
     build: ./backend
-    ports: ["8000:8000"]
+    # No host port published — only reachable through the caddy reverse
+    # proxy above, over the internal compose network.
     environment:
-      DATABASE_URL: postgresql+asyncpg://user:password@postgres/nse_arena
-      REDIS_URL: redis://redis:6379
+      ENV: production
+      DATABASE_URL: postgresql+asyncpg://user:${POSTGRES_PASSWORD}@postgres/nse_arena
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      SECRET_KEY: ${SECRET_KEY}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,18 +36,23 @@ services:
     environment:
       POSTGRES_DB: nse_arena
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes: ["postgres_data:/var/lib/postgresql/data"]
-    ports: ["5432:5432"]
+    # No host port published — reachable only from other compose services.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d nse_arena"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    # No host port published — reachable only from other compose services.
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

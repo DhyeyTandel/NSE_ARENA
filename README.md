@@ -177,10 +177,28 @@ The app will be available at `http://localhost:5173`.
 
 ```bash
 # From the project root
-docker-compose up --build
+cp .env.deploy.example .env.deploy
+# Edit .env.deploy — POSTGRES_PASSWORD, REDIS_PASSWORD, and SECRET_KEY
+# are required; docker-compose refuses to start any of those services
+# without them.
+
+docker-compose --env-file .env.deploy up --build
 ```
 
-This starts the backend, PostgreSQL, and Redis together.
+This starts Caddy (reverse proxy, ports 80/443), the backend, PostgreSQL,
+and Redis together. Postgres, Redis, and the backend itself do **not**
+publish ports to the host — Caddy is the only entry point, reverse-proxying
+to the backend over the internal compose network and handling HTTPS
+automatically once `DOMAIN` in `.env.deploy` points at a real domain (it
+serves plain HTTP for local testing when `DOMAIN` is unset or `localhost`).
+
+| `.env.deploy` variable | Required | Description |
+|---|---|---|
+| `POSTGRES_PASSWORD` | Yes | Postgres password for the `user` account |
+| `REDIS_PASSWORD` | Yes | Redis `requirepass` — also needed since other containers share the Docker network |
+| `SECRET_KEY` | Yes | JWT signing secret |
+| `GEMINI_API_KEY` | No | AI trading agent is disabled without it |
+| `DOMAIN` | No | Domain for Caddy's automatic HTTPS; defaults to `localhost` |
 
 ---
 
