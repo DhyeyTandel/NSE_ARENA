@@ -2,6 +2,7 @@
 from datetime import datetime, time
 import pytz
 from .models import Order, OrderSide
+from . import market_calendar
 
 IST = pytz.timezone("Asia/Kolkata")
 MARKET_OPEN = time(9, 15)
@@ -41,10 +42,14 @@ class Validator:
             self._check_holdings(order, holdings)
 
     def _check_market_hours(self) -> None:
-        """Reject orders outside 9:15 AM – 3:30 PM IST, Monday–Friday"""
+        """Reject orders outside 9:15 AM – 3:30 PM IST, Monday–Friday,
+        and on NSE holidays"""
         now = datetime.now(IST)
         if now.weekday() >= 5:  # Saturday=5, Sunday=6
             raise MarketClosedError("Market is closed on weekends")
+        holiday = market_calendar.holiday_name(now.date())
+        if holiday:
+            raise MarketClosedError(f"Market is closed today: {holiday} (NSE holiday)")
         current_time = now.time()
         if current_time < MARKET_OPEN or current_time > MARKET_CLOSE:
             raise MarketClosedError(
