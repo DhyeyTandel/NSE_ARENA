@@ -32,7 +32,7 @@ export function Dashboard({ token, user }) {
   }, [portfolio]);
 
   const startingCapital = portfolio?.starting_capital || 100000;
-  const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL);
+  const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL, token);
 
   const portfolioStats = useMemo(() => {
     if (portfolio) {

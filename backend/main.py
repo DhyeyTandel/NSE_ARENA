@@ -60,11 +60,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Could not ensure active season: %s", e)
 
-    # Start background price polling
+    # Start background price polling + the single shared WS fan-out task
+    fanout_task = None
     try:
         redis_ok = await broadcaster.check_health()
         if redis_ok:
             await broadcaster.start_polling()
+            fanout_task = await websocket.start_price_fanout(broadcaster)
             logger.info("Redis connected — live price streaming active")
         else:
             logger.warning("Redis not available — running without live prices")
@@ -81,6 +83,12 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     await ai_scheduler.stop()
+    if fanout_task:
+        fanout_task.cancel()
+        try:
+            await fanout_task
+        except asyncio.CancelledError:
+            pass
     await broadcaster.close()
     logger.info("Broadcaster and scheduler shut down")
 
