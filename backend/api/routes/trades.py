@@ -1,7 +1,7 @@
 # api/routes/trades.py
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
@@ -138,7 +138,21 @@ async def submit_trade(
     position_size_pct = (execution_price * request.quantity) / pre_trade_portfolio_value if pre_trade_portfolio_value > 0 else 0
 
     if request.side == "buy":
-        # Deduct cash
+        # Guarded UPDATE backstop: with_for_update() is a silent no-op on
+        # SQLite, so this conditional UPDATE is the only thing that actually
+        # prevents overdraw there. rowcount == 0 means another concurrent
+        # trade already spent the balance this order needed.
+        debit_result = await db.execute(
+            update(Portfolio)
+            .where(Portfolio.id == portfolio.id, Portfolio.cash_balance >= total_cost)
+            .values(cash_balance=Portfolio.cash_balance - total_cost)
+            .execution_options(synchronize_session=False)
+        )
+        if debit_result.rowcount == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient balance. Required: ₹{total_cost:,.2f}, Available: ₹{portfolio.cash_balance:,.2f}"
+            )
         portfolio.cash_balance -= total_cost
 
         settlement_date = settlement_engine.calculate_settlement_date(datetime.utcnow())
@@ -188,11 +202,25 @@ async def submit_trade(
                 detail=f"Insufficient shares. Available: {available}, Requested: {request.quantity}"
             )
 
+        # Guarded UPDATE backstop, same reasoning as the buy-side debit above:
+        # atomic and conditional even where with_for_update() is a no-op.
+        debit_result = await db.execute(
+            update(Position)
+            .where(Position.id == existing_pos.id, Position.quantity >= request.quantity)
+            .values(quantity=Position.quantity - request.quantity)
+            .execution_options(synchronize_session=False)
+        )
+        if debit_result.rowcount == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient shares. Available: {existing_pos.quantity}, Requested: {request.quantity}"
+            )
+
         # Add cash (minus fees)
         sell_value = execution_price * request.quantity - fees.total
         portfolio.cash_balance += sell_value
 
-        # Update position
+        # Update in-memory position to match the guarded UPDATE above
         existing_pos.quantity -= request.quantity
         if existing_pos.quantity == 0:
             await db.delete(existing_pos)

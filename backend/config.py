@@ -1,9 +1,17 @@
 # config.py
 import os
 
+ENV = os.getenv("ENV", "development")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./nse_arena.db")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+if ENV == "production" and DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError(
+        "DATABASE_URL is sqlite but ENV=production. Row-locking guarantees "
+        "(with_for_update) are a silent no-op on SQLite, so production must "
+        "run on Postgres. Refusing to boot."
+    )
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY or SECRET_KEY == "your-secret-key-change-in-production":
