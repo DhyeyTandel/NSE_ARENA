@@ -6,12 +6,13 @@ import asyncio
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from database import async_session
 from api.dependencies import get_current_user_optional, get_current_user
+from api.rate_limit import check_rate_limit
 from market_data.fetcher import MarketDataFetcher
 from scripting.engine import run_script
 
@@ -182,8 +183,14 @@ plot(atrValue, title="ATR", color=color.orange, linewidth=2)
 # ── Endpoints ───────────────────────────────────────────────────────────────
 
 @router.post("/run")
-async def run_user_script(req: RunScriptRequest, user=Depends(get_current_user)):
+async def run_user_script(req: RunScriptRequest, http_request: Request,
+                          user=Depends(get_current_user)):
     """Execute a PineScript-lite program against market data."""
+    await check_rate_limit(
+        http_request, bucket="scripts_run", identity=f"user:{user.id}",
+        limit=10, window_seconds=60
+    )
+
     if not req.code.strip():
         raise HTTPException(400, "Script code is empty")
     if len(req.code) > 10_000:

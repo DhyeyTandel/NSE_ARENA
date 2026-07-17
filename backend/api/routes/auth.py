@@ -1,5 +1,5 @@
 # api/routes/auth.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -12,6 +12,7 @@ from typing import Optional
 from database import get_db
 from db.models import User, Portfolio, Season
 from api.dependencies import get_current_user
+from api.rate_limit import check_rate_limit, client_ip
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, STARTING_CAPITAL
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,7 +44,12 @@ def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(request: RegisterRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+    await check_rate_limit(
+        http_request, bucket="register", identity=client_ip(http_request),
+        limit=3, window_seconds=3600
+    )
+
     # Check if username exists
     result = await db.execute(select(User).where(User.username == request.username))
     if result.scalar_one_or_none():
@@ -84,8 +90,14 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(),
+async def login(http_request: Request,
+                form_data: OAuth2PasswordRequestForm = Depends(),
                 db: AsyncSession = Depends(get_db)):
+    await check_rate_limit(
+        http_request, bucket="login", identity=client_ip(http_request),
+        limit=5, window_seconds=60
+    )
+
     result = await db.execute(select(User).where(User.username == form_data.username))
     user = result.scalar_one_or_none()
 
@@ -101,8 +113,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(),
 
 
 @router.post("/login/json", response_model=TokenResponse)
-async def login_json(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login_json(request: LoginRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
     """JSON-body login alternative (used by the frontend)"""
+    # Same "login" bucket as /auth/login — otherwise an attacker just
+    # switches endpoints to dodge the limit.
+    await check_rate_limit(
+        http_request, bucket="login", identity=client_ip(http_request),
+        limit=5, window_seconds=60
+    )
+
     result = await db.execute(select(User).where(User.username == request.username))
     user = result.scalar_one_or_none()
 
