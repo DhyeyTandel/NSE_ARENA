@@ -147,9 +147,10 @@ source venv/bin/activate        # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment (optional — defaults work for local dev)
-cp .env .env.local
-# Edit .env.local with your Gemini API key, DB URL, etc.
+# Configure environment — SECRET_KEY is required, the app refuses to boot
+# without it. Everything else has a working default for local dev.
+cp .env.example .env
+# Edit .env: set SECRET_KEY at minimum, plus your Gemini API key, DB URL, etc.
 
 # Run the server
 uvicorn main:app --reload --port 8000
@@ -251,11 +252,14 @@ sellSignal = ta.crossunder(fast, slow)
 
 ## ⚙️ Environment Variables
 
+See [`backend/.env.example`](backend/.env.example) for the full list with comments.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `ENV` | `development` | `production` refuses to boot against a sqlite `DATABASE_URL` |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./nse_arena.db` | Async DB connection string |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `SECRET_KEY` | *(dev default)* | JWT signing secret — **change in prod** |
+| `SECRET_KEY` | *(none — required)* | JWT signing secret; the app refuses to boot without it |
 | `GEMINI_API_KEY` | *(empty)* | Google Gemini API key for AI agents |
 
 ---
