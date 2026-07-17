@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import time
 import redis.asyncio as redis
 from config import REDIS_URL
 
@@ -32,10 +33,14 @@ class PriceBroadcaster:
         return pubsub
 
     async def cache_price(self, ticker: str, price_data: dict) -> None:
-        """Cache latest price in Redis"""
+        """Cache latest price in Redis. Stamps fetched_at so callers on
+        the trade-execution path can tell how stale this entry is —
+        display/portfolio paths can use the full 120s TTL, but execution
+        needs a much tighter staleness bound (see submit_trade)."""
+        stamped = {**price_data, "fetched_at": time.time()}
         await self.redis.set(
             f"price:{ticker}",
-            json.dumps(price_data),
+            json.dumps(stamped),
             ex=120  # 2 minute TTL
         )
 

@@ -13,6 +13,7 @@ transaction locking — an in-memory DB defaults to a single shared
 StaticPool connection, where interleaved sessions can roll back each
 other's commits and the test would not exercise real concurrency.
 """
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -78,7 +79,9 @@ async def test_concurrent_buys_race_on_sqlite(test_db):
 
     app.dependency_overrides[get_db] = override_get_db
     app.state.broadcaster = AsyncMock()
-    app.state.broadcaster.get_cached_price = AsyncMock(return_value=MOCK_PRICE)
+    app.state.broadcaster.get_cached_price = AsyncMock(
+        return_value={**MOCK_PRICE, "fetched_at": time.time()}
+    )
 
     monday_patch = patch("engine.validator.datetime")
 

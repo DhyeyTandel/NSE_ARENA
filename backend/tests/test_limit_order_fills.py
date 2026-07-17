@@ -7,6 +7,7 @@ rejected outright. This closes the fake-profit exploit where a limit buy
 placed inside the +-10% circuit-breaker band but below market price filled
 instantly at the user's chosen price.
 """
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -72,7 +73,9 @@ async def client_and_token(test_db):
     app.dependency_overrides[get_db] = override_get_db
 
     app.state.broadcaster = AsyncMock()
-    app.state.broadcaster.get_cached_price = AsyncMock(return_value=MOCK_PRICE)
+    app.state.broadcaster.get_cached_price = AsyncMock(
+        return_value={**MOCK_PRICE, "fetched_at": time.time()}
+    )
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

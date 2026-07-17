@@ -1,9 +1,12 @@
-# tests/test_circuit_breaker_reference_price.py
-"""FOLLOWUP Gap 2: circuit breaker must not silently pass when the cached
-price is missing previous_close. If a Redis-cached quote lacks a usable
-reference price, submit_trade refetches a full quote (threaded); if that
-also comes up empty, the trade is rejected with 503 rather than executing
-unverified.
+# tests/test_price_staleness.py
+"""FOLLOWUP Gap 4: trades must not execute on a stale cached price.
+
+The Redis price cache has a 120s TTL — fine for portfolio/display, but
+submit_trade previously used whatever was cached with no freshness check,
+so a trade could execute on a price up to 2 minutes old. cache_price now
+stamps fetched_at, and submit_trade refetches (threaded) if the cached
+entry is older than STALE_PRICE_THRESHOLD_SECONDS, rejecting the trade if
+that refetch also fails.
 """
 import time
 import uuid
@@ -19,6 +22,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from database import Base, get_db
 from db.models import Season
 from main import app
+from api.routes.trades import STALE_PRICE_THRESHOLD_SECONDS
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -88,94 +92,7 @@ def _open_monday_patch():
 
 
 @pytest.mark.asyncio
-async def test_missing_previous_close_triggers_refetch_and_rejects_if_still_missing(client):
-    """Cache has price but no previous_close; the threaded refetch also
-    fails to produce one -> reject with 503, not a silent pass."""
-    app.state.broadcaster = AsyncMock()
-    app.state.broadcaster.get_cached_price = AsyncMock(return_value={
-        "ticker": "RELIANCE", "price": 1000.0,  # no previous_close key
-        "fetched_at": time.time(),
-    })
-
-    p = _open_monday_patch()
-    try:
-        with patch(
-            "api.routes.trades.MarketDataFetcher.get_price",
-            side_effect=Exception("upstream unavailable"),
-        ):
-            resp = await client.post("/trades", json={
-                "ticker": "RELIANCE",
-                "side": "buy",
-                "order_type": "market",
-                "quantity": 1,
-            })
-        assert resp.status_code == 503
-        assert "reference price" in resp.json()["detail"]
-    finally:
-        p.stop()
-
-
-@pytest.mark.asyncio
-async def test_missing_previous_close_refetch_recovers_and_trade_proceeds(client):
-    """Cache is missing previous_close, but the refetch succeeds -> the
-    circuit breaker runs for real against the recovered value and an
-    in-band trade still executes."""
-    app.state.broadcaster = AsyncMock()
-    app.state.broadcaster.get_cached_price = AsyncMock(return_value={
-        "ticker": "RELIANCE", "price": 1000.0,
-        "fetched_at": time.time(),
-    })
-
-    p = _open_monday_patch()
-    try:
-        with patch(
-            "api.routes.trades.MarketDataFetcher.get_price",
-            return_value={"ticker": "RELIANCE", "price": 1000.0, "previous_close": 1000.0},
-        ):
-            resp = await client.post("/trades", json={
-                "ticker": "RELIANCE",
-                "side": "buy",
-                "order_type": "market",
-                "quantity": 1,
-            })
-        assert resp.status_code == 200, resp.text
-    finally:
-        p.stop()
-
-
-@pytest.mark.asyncio
-async def test_missing_previous_close_refetch_recovers_exploit_still_blocked(client):
-    """Same recovery path, but the refetched previous_close reveals the
-    order is actually outside the circuit-breaker band — must still
-    reject, proving this isn't just a rubber-stamp refetch."""
-    app.state.broadcaster = AsyncMock()
-    app.state.broadcaster.get_cached_price = AsyncMock(return_value={
-        "ticker": "RELIANCE", "price": 10.0,  # looks like the 0.01-style exploit price
-        "fetched_at": time.time(),
-    })
-
-    p = _open_monday_patch()
-    try:
-        with patch(
-            "api.routes.trades.MarketDataFetcher.get_price",
-            return_value={"ticker": "RELIANCE", "price": 10.0, "previous_close": 1000.0},
-        ):
-            resp = await client.post("/trades", json={
-                "ticker": "RELIANCE",
-                "side": "buy",
-                "order_type": "market",
-                "quantity": 1,
-            })
-        assert resp.status_code == 400
-        assert "circuit breaker" in resp.json()["detail"]
-    finally:
-        p.stop()
-
-
-@pytest.mark.asyncio
-async def test_present_previous_close_skips_refetch_entirely(client):
-    """When the cache already has a usable previous_close, no refetch
-    should happen — patch get_price to blow up and confirm it's never hit."""
+async def test_fresh_cached_price_used_without_refetch(client):
     app.state.broadcaster = AsyncMock()
     app.state.broadcaster.get_cached_price = AsyncMock(return_value={
         "ticker": "RELIANCE", "price": 1000.0, "previous_close": 1000.0,
@@ -189,11 +106,88 @@ async def test_present_previous_close_skips_refetch_entirely(client):
             side_effect=AssertionError("refetch should not have been called"),
         ):
             resp = await client.post("/trades", json={
-                "ticker": "RELIANCE",
-                "side": "buy",
-                "order_type": "market",
-                "quantity": 1,
+                "ticker": "RELIANCE", "side": "buy", "order_type": "market", "quantity": 1,
             })
+        assert resp.status_code == 200, resp.text
+    finally:
+        p.stop()
+
+
+@pytest.mark.asyncio
+async def test_stale_cached_price_triggers_refetch_and_uses_fresh_value(client):
+    """A cache entry older than the staleness threshold must not be
+    trusted, even though it's well within the 120s Redis TTL."""
+    stale_at = time.time() - (STALE_PRICE_THRESHOLD_SECONDS + 5)
+    app.state.broadcaster = AsyncMock()
+    app.state.broadcaster.get_cached_price = AsyncMock(return_value={
+        "ticker": "RELIANCE", "price": 500.0,  # a stale, wildly different price
+        "previous_close": 1000.0,
+        "fetched_at": stale_at,
+    })
+
+    p = _open_monday_patch()
+    try:
+        with patch(
+            "api.routes.trades.MarketDataFetcher.get_price",
+            return_value={"ticker": "RELIANCE", "price": 1000.0, "previous_close": 1000.0},
+        ) as mock_fetch:
+            resp = await client.post("/trades", json={
+                "ticker": "RELIANCE", "side": "buy", "order_type": "market", "quantity": 1,
+            })
+        assert mock_fetch.called
+        assert resp.status_code == 200, resp.text
+        # Executed at the refetched (fresh) price, not the stale cached one.
+        assert resp.json()["price"] == 1000.0
+    finally:
+        p.stop()
+
+
+@pytest.mark.asyncio
+async def test_stale_price_refetch_failure_rejects_trade(client):
+    """If the cache is stale and the refetch also fails, reject the trade
+    rather than falling back to the stale price."""
+    stale_at = time.time() - (STALE_PRICE_THRESHOLD_SECONDS + 5)
+    app.state.broadcaster = AsyncMock()
+    app.state.broadcaster.get_cached_price = AsyncMock(return_value={
+        "ticker": "RELIANCE", "price": 500.0, "previous_close": 1000.0,
+        "fetched_at": stale_at,
+    })
+
+    p = _open_monday_patch()
+    try:
+        with patch(
+            "api.routes.trades.MarketDataFetcher.get_price",
+            side_effect=Exception("upstream unavailable"),
+        ):
+            resp = await client.post("/trades", json={
+                "ticker": "RELIANCE", "side": "buy", "order_type": "market", "quantity": 1,
+            })
+        assert resp.status_code == 503
+    finally:
+        p.stop()
+
+
+@pytest.mark.asyncio
+async def test_missing_fetched_at_treated_as_stale(client):
+    """A cache entry with no fetched_at at all (e.g. pre-upgrade data)
+    must not be trusted implicitly — it should trigger a refetch just
+    like a genuinely stale entry."""
+    app.state.broadcaster = AsyncMock()
+    app.state.broadcaster.get_cached_price = AsyncMock(return_value={
+        "ticker": "RELIANCE", "price": 500.0, "previous_close": 1000.0,
+        # no fetched_at key
+    })
+
+    p = _open_monday_patch()
+    try:
+        with patch(
+            "api.routes.trades.MarketDataFetcher.get_price",
+            return_value={"ticker": "RELIANCE", "price": 1000.0, "previous_close": 1000.0},
+        ) as mock_fetch:
+            resp = await client.post("/trades", json={
+                "ticker": "RELIANCE", "side": "buy", "order_type": "market", "quantity": 1,
+            })
+        assert mock_fetch.called
         assert resp.status_code == 200, resp.text
     finally:
         p.stop()

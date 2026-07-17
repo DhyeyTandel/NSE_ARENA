@@ -5,6 +5,7 @@ from sqlalchemy import select, update
 from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
+import time
 
 from database import get_db
 from db.models import User, Portfolio, Position, TradeRecord, Season
@@ -21,6 +22,10 @@ from engine.validator import (
 router = APIRouter(prefix="/trades", tags=["trades"])
 fee_engine = FeeEngine()
 settlement_engine = SettlementEngine()
+
+# Execution needs a much tighter staleness bound than the 120s display
+# cache TTL — a price up to 2 minutes old is fine to show, not to trade on.
+STALE_PRICE_THRESHOLD_SECONDS = 15
 
 
 class TradeRequest(BaseModel):
@@ -60,14 +65,30 @@ async def submit_trade(
     if request.order_type == "limit" and request.limit_price <= 0:
         raise HTTPException(status_code=400, detail="Limit price must be greater than zero for limit orders")
 
-    # Try fetching price from Redis cache first
+    async def _refetch_quote() -> dict | None:
+        try:
+            fresh = await asyncio.to_thread(MarketDataFetcher.get_price, request.ticker)
+            fresh["fetched_at"] = time.time()
+            return fresh
+        except Exception:
+            return None
+
+    # Try fetching price from Redis cache first. A cached price older
+    # than STALE_PRICE_THRESHOLD_SECONDS isn't good enough to execute
+    # on (120s cache TTL is fine for display, not for trading) — refetch
+    # instead, and reject rather than execute on a stale price if that
+    # refetch fails.
     broadcaster = http_request.app.state.broadcaster
     price_data = await broadcaster.get_cached_price(request.ticker)
+    if price_data:
+        age_seconds = time.time() - (price_data.get("fetched_at") or 0)
+        if age_seconds > STALE_PRICE_THRESHOLD_SECONDS:
+            price_data = await _refetch_quote()
+    else:
+        price_data = await _refetch_quote()
+
     if not price_data:
-        try:
-            price_data = await asyncio.to_thread(MarketDataFetcher.get_price, request.ticker)
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Could not fetch price for {request.ticker}")
+        raise HTTPException(status_code=503, detail=f"Could not fetch a current price for {request.ticker}")
 
     current_price = price_data.get("price", 0.0)
     if current_price <= 0:
@@ -79,11 +100,8 @@ async def submit_trade(
     # empty rather than trading on an unverifiable reference price.
     previous_close = price_data.get("previous_close", 0.0) or 0.0
     if previous_close <= 0:
-        try:
-            fresh_quote = await asyncio.to_thread(MarketDataFetcher.get_price, request.ticker)
-            previous_close = fresh_quote.get("previous_close", 0.0) or 0.0
-        except Exception:
-            previous_close = 0.0
+        fresh_quote = await _refetch_quote()
+        previous_close = (fresh_quote or {}).get("previous_close", 0.0) or 0.0
         if previous_close <= 0:
             raise HTTPException(
                 status_code=503,

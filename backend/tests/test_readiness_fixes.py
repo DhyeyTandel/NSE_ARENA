@@ -117,6 +117,7 @@ async def test_limit_far_below_market_rejected(client_and_token):
         "ticker": "RELIANCE",
         "price": 1000.0,
         "previous_close": 1000.0,
+        "fetched_at": time.time(),
     }
 
     with patch("engine.validator.datetime") as mock_dt, \
@@ -149,6 +150,7 @@ async def test_trade_rejected_outside_market_hours(client_and_token):
         "ticker": "RELIANCE",
         "price": 1000.0,
         "previous_close": 1000.0,
+        "fetched_at": time.time(),
     }
 
     with patch("engine.validator.datetime") as mock_dt, \
