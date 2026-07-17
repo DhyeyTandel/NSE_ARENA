@@ -1,4 +1,5 @@
 # ai/agent.py
+import asyncio
 import google.generativeai as genai
 import json
 from .risk_memory import AIRiskMemory
@@ -7,6 +8,8 @@ from .prompts import SYSTEM_PROMPT, RESPONSE_FORMAT
 from config import GEMINI_API_KEY
 
 genai.configure(api_key=GEMINI_API_KEY)
+
+GEMINI_CALL_TIMEOUT_SECONDS = 30
 
 
 class AIAgent:
@@ -22,14 +25,22 @@ class AIAgent:
         prompt = self._build_prompt(market_data)
 
         try:
-            response = await self.model.generate_content_async(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.3,  # lower = more consistent, less creative
-                    response_mime_type="application/json"
-                )
+            response = await asyncio.wait_for(
+                self.model.generate_content_async(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.3,  # lower = more consistent, less creative
+                        response_mime_type="application/json"
+                    )
+                ),
+                timeout=GEMINI_CALL_TIMEOUT_SECONDS,
             )
             decision = json.loads(response.text)
+        except asyncio.TimeoutError:
+            return {
+                "action": "hold",
+                "reason": f"Gemini call timed out after {GEMINI_CALL_TIMEOUT_SECONDS}s",
+            }
         except Exception as e:
             return {"action": "hold", "reason": f"Parse error: {e}"}
 
