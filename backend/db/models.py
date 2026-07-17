@@ -1,5 +1,5 @@
 # db/models.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, CheckConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, CheckConstraint, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -28,6 +28,20 @@ class Season(Base):
     end_date = Column(DateTime, nullable=False)
     starting_capital = Column(Float, default=100000.0)
     is_active = Column(Boolean, default=True)
+
+    # Partial unique index: at most one row with is_active=True at a time.
+    # Closes the race where two workers booting simultaneously both see no
+    # active season and both create one — the second INSERT now fails with
+    # an IntegrityError instead of silently producing two active seasons.
+    __table_args__ = (
+        Index(
+            "uq_seasons_one_active",
+            "is_active",
+            unique=True,
+            sqlite_where=is_active.is_(True),
+            postgresql_where=is_active.is_(True),
+        ),
+    )
 
     portfolios = relationship("Portfolio", back_populates="season")
 

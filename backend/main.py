@@ -25,8 +25,16 @@ broadcaster = PriceBroadcaster()
 
 
 async def ensure_active_season():
-    """Auto-create Season 1 if no seasons exist"""
+    """Auto-create Season 1 if no seasons exist.
+
+    The partial unique index on Season.is_active (db/models.py) means at
+    most one worker can win this race: if another process already created
+    the active season between our check and our commit, the INSERT fails
+    with an IntegrityError, which we treat as "someone else already did
+    this" rather than a startup failure.
+    """
     from sqlalchemy import select
+    from sqlalchemy.exc import IntegrityError
     from db.models import Season
 
     async with async_session() as db:
@@ -41,8 +49,12 @@ async def ensure_active_season():
                 starting_capital=100000.0,
             )
             db.add(season)
-            await db.commit()
-            logger.info("Created Season 1 (30 days, ₹1,00,000 starting capital)")
+            try:
+                await db.commit()
+                logger.info("Created Season 1 (30 days, ₹1,00,000 starting capital)")
+            except IntegrityError:
+                await db.rollback()
+                logger.info("Active season already created by another worker")
         else:
             logger.info("Active season: %s", season.name)
 
