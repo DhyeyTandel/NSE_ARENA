@@ -1,6 +1,7 @@
 // screens/Leaderboard.jsx
 import { useState, useEffect } from 'react';
 import { LeaderboardRow } from '../components/LeaderboardRow';
+import { API_URL } from '../config';
 
 const DEMO_LEADERBOARD = [
   { rank: 1, trader: { name: 'SharpeEdge', initials: 'SE', tag: '14 trades · 12d active' }, score: 812, grade: 'Elite', returnPct: '+8.4%', drawdown: '-2.1%', value: '₹1,08,420', isYou: false, isAI: false },
@@ -20,12 +21,12 @@ export function Leaderboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const seasonRes = await fetch('http://localhost:8000/seasons/active');
+        const seasonRes = await fetch(`${API_URL}/seasons/active`);
         if (seasonRes.ok) {
           const seasonData = await seasonRes.json();
           if (seasonData) setSeason(seasonData);
         }
-        const lbRes = await fetch('http://localhost:8000/leaderboard');
+        const lbRes = await fetch(`${API_URL}/leaderboard`);
         if (lbRes.ok) {
           const lbData = await lbRes.json();
           if (lbData.length > 0) {

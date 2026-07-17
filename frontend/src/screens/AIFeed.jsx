@@ -1,6 +1,7 @@
 // screens/AIFeed.jsx
 import { useState, useEffect } from 'react';
 import { AIFeedEntry } from '../components/AIFeedEntry';
+import { API_URL } from '../config';
 
 const DEMO_AI_FEED = [
   {
@@ -52,7 +53,7 @@ export function AIFeed() {
   useEffect(() => {
     const fetchDecisions = async () => {
       try {
-        const response = await fetch('http://localhost:8000/ai/decisions?limit=20');
+        const response = await fetch(`${API_URL}/ai/decisions?limit=20`);
         if (response.ok) {
           const decisions = await response.json();
           if (decisions.length > 0) {

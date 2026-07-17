@@ -1,8 +1,7 @@
 // hooks/useAuth.js
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-
-const API_URL = 'http://localhost:8000';
+import { API_URL } from '../config';
 
 // Auth lives in an httpOnly cookie set by the backend — JS never sees the
 // token (closes the XSS-token-theft hole of localStorage). Every request

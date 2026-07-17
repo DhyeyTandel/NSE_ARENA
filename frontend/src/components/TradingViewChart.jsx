@@ -5,8 +5,7 @@
  */
 import { useEffect, useRef, useState, memo } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
-
-const API_BASE = 'http://localhost:8000';
+import { API_URL as API_BASE } from '../config';
 
 function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
   const containerRef = useRef(null);

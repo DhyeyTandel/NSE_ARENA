@@ -6,14 +6,13 @@ import { OrderPanel } from '../components/OrderPanel';
 import { PositionsTable } from '../components/PositionsTable';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { usePortfolio } from '../hooks/usePortfolio';
+import { API_URL, WS_URL } from '../config';
 
 const DEMO_POSITIONS = [
   { ticker: 'RELIANCE', quantity: 10, avg_price: 2847.30, current_price: 2891.45, state: 'confirmed' },
   { ticker: 'TCS', quantity: 5, avg_price: 3920.00, current_price: 3885.60, state: 'confirmed' },
   { ticker: 'INFY', quantity: 15, avg_price: 1520.75, current_price: 1548.20, state: 'pending' },
 ];
-
-const WS_URL = 'ws://localhost:8000/ws/prices';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -65,7 +64,7 @@ export function Dashboard({ authenticated, user }) {
   const handleSubmit = async (order) => {
     if (!authenticated) return;
     try {
-      const response = await fetch('http://localhost:8000/trades', {
+      const response = await fetch(`${API_URL}/trades`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },

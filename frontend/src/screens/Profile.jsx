@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { KpiCard } from '../components/KpiCard';
 import { TraderScoreCard } from '../components/TraderScoreCard';
 import { SeasonHistory } from '../components/SeasonHistory';
+import { API_URL } from '../config';
 
 const DEMO_BREAKDOWN = [
   { key: 'returns', label: 'Returns', weight: 30, score: 0 },
@@ -26,13 +27,13 @@ export function Profile({ authenticated, user }) {
     if (!authenticated || !user) return;
     const fetchScore = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/score/${user.id}`);
+        const response = await fetch(`${API_URL}/score/${user.id}`);
         if (response.ok) setScoreData(await response.json());
       } catch { /* Use defaults */ }
     };
     const fetchPortfolio = async () => {
       try {
-        const response = await fetch('http://localhost:8000/portfolio', {
+        const response = await fetch(`${API_URL}/portfolio`, {
           credentials: 'include',
         });
         if (response.ok) setPortfolioData(await response.json());

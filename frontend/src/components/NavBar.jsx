@@ -1,5 +1,6 @@
 // components/NavBar.jsx
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config';
 
 const NAV_ITEMS = [
   {
@@ -72,7 +73,7 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
   useEffect(() => {
     const fetchSeason = async () => {
       try {
-        const response = await fetch('http://localhost:8000/seasons/active');
+        const response = await fetch(`${API_URL}/seasons/active`);
         if (response.ok) {
           const data = await response.json();
           if (data) setSeason(data);

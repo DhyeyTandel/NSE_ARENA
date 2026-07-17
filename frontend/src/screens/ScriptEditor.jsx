@@ -7,9 +7,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MonacoEditor } from '../components/MonacoEditor';
 import { IndicatorChart } from '../components/IndicatorChart';
+import { API_URL as API } from '../config';
 import './ScriptEditor.css';
-
-const API = 'http://localhost:8000';
 
 const DEFAULT_CODE = `//@version=5
 indicator("RSI", overlay=false)
