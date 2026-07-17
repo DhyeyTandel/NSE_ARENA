@@ -1,5 +1,5 @@
 # db/models.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, CheckConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -34,6 +34,9 @@ class Season(Base):
 
 class Portfolio(Base):
     __tablename__ = "portfolios"
+    __table_args__ = (
+        CheckConstraint("cash_balance >= 0", name="chk_portfolio_cash_balance_non_negative"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

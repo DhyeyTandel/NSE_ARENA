@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -156,6 +157,7 @@ class PineEngine:
     """
 
     def __init__(self, ohlcv: list[dict], timestamps: list[int]):
+        self.start_time = time.perf_counter()
         n = len(ohlcv)
         self.n = n
         self.timestamps = timestamps
@@ -298,6 +300,8 @@ class PineEngine:
         lines = code.strip().split("\n")
         i = 0
         while i < len(lines):
+            if time.perf_counter() - self.start_time > 8.0:
+                raise TimeoutError("Script execution timed out (8s CPU limit)")
             line = lines[i].strip()
             i += 1
 
@@ -492,6 +496,8 @@ class PineEngine:
 
     def _eval_expr(self, expr: str) -> Any:
         """Evaluate an expression and return a value (array, scalar, or string)."""
+        if time.perf_counter() - self.start_time > 8.0:
+            raise TimeoutError("Script execution timed out (8s CPU limit)")
         expr = expr.strip()
 
         # String literal

@@ -22,9 +22,8 @@ async def websocket_prices(websocket: WebSocket):
     connected_clients.append(websocket)
     logger.info("WebSocket client connected. Total clients: %d", len(connected_clients))
 
-    # Import broadcaster lazily to avoid circular imports
-    from market_data.broadcaster import PriceBroadcaster
-    broadcaster = PriceBroadcaster()
+    broadcaster = websocket.app.state.broadcaster
+    pubsub = None
 
     try:
         # Send all cached prices immediately on connect
@@ -32,7 +31,7 @@ async def websocket_prices(websocket: WebSocket):
         for ticker, price_data in cached_prices.items():
             await websocket.send_json(price_data)
 
-        # Subscribe to Redis pub/sub for live updates
+        # Subscribe to Redis price updates
         pubsub = await broadcaster.subscribe()
 
         # Listen for new price updates from Redis
@@ -56,7 +55,8 @@ async def websocket_prices(websocket: WebSocket):
     finally:
         if websocket in connected_clients:
             connected_clients.remove(websocket)
-        await broadcaster.close()
+        if pubsub:
+            await pubsub.close()
         logger.info("WebSocket cleanup done. Remaining clients: %d", len(connected_clients))
 
 

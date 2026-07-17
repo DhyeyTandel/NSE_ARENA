@@ -22,7 +22,7 @@ class AIAgent:
         prompt = self._build_prompt(market_data)
 
         try:
-            response = self.model.generate_content(
+            response = await self.model.generate_content_async(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.3,  # lower = more consistent, less creative

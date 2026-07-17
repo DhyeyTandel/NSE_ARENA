@@ -1,7 +1,8 @@
 # api/routes/portfolio.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import asyncio
 
 from database import get_db
 from db.models import User, Portfolio, Position, Season
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 @router.get("")
 async def get_portfolio(
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -43,15 +45,26 @@ async def get_portfolio(
     holdings = []
     total_holdings_value = 0.0
 
-    for pos in positions:
-        if pos.quantity <= 0:
-            continue
-        try:
-            price_data = MarketDataFetcher.get_price(pos.ticker)
-            current_price = price_data["price"]
-        except Exception:
-            current_price = pos.avg_price
+    # Try fetching all prices from Redis cache or yfinance in parallel off-thread
+    broadcaster = request.app.state.broadcaster
+    active_positions = [pos for pos in positions if pos.quantity > 0]
 
+    async def get_price_for_ticker(ticker: str, avg_price: float):
+        cached = await broadcaster.get_cached_price(ticker)
+        if cached:
+            return cached.get("price", avg_price)
+        try:
+            # Fallback to yfinance in thread pool
+            price_data = await asyncio.to_thread(MarketDataFetcher.get_price, ticker)
+            return price_data.get("price", avg_price)
+        except Exception:
+            return avg_price
+
+    prices = await asyncio.gather(*(get_price_for_ticker(pos.ticker, pos.avg_price) for pos in active_positions))
+    price_map = {pos.ticker: price for pos, price in zip(active_positions, prices)}
+
+    for pos in active_positions:
+        current_price = price_map.get(pos.ticker, pos.avg_price)
         current_value = current_price * pos.quantity
         invested_value = pos.avg_price * pos.quantity
         pnl = current_value - invested_value

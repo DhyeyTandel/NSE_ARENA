@@ -1,6 +1,8 @@
 # tests/conftest.py
 import sys
 import os
+os.environ["SECRET_KEY"] = "test-secret-key-fallback-that-is-long-enough-to-prevent-any-jwt-signing-error"
+
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 import pandas as pd

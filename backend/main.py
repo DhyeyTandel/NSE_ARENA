@@ -1,10 +1,10 @@
 # main.py
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from database import init_db, async_session
 from api.routes import auth, trades, portfolio, leaderboard, websocket
 from api.routes import seasons as seasons_router
@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     logger.info("Database initialized")
+    app.state.broadcaster = broadcaster
 
     # Ensure at least one season exists
     try:
@@ -96,8 +97,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Mount routes
@@ -136,7 +137,7 @@ async def get_price(ticker: str):
     cached = await broadcaster.get_cached_price(ticker)
     if cached:
         from market_data.fetcher import MarketDataFetcher
-        ohlcv = MarketDataFetcher.get_ohlcv(ticker, period="1mo")
+        ohlcv = await asyncio.to_thread(MarketDataFetcher.get_ohlcv, ticker, period="1mo")
         return {
             "ticker": ticker,
             "current": cached,
@@ -144,8 +145,10 @@ async def get_price(ticker: str):
         }
 
     from market_data.fetcher import MarketDataFetcher
-    ohlcv = MarketDataFetcher.get_ohlcv(ticker, period="1mo")
-    price = MarketDataFetcher.get_price(ticker)
+    ohlcv, price = await asyncio.gather(
+        asyncio.to_thread(MarketDataFetcher.get_ohlcv, ticker, period="1mo"),
+        asyncio.to_thread(MarketDataFetcher.get_price, ticker)
+    )
     return {
         "ticker": ticker,
         "current": price,

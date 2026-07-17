@@ -67,7 +67,7 @@ class PriceBroadcaster:
         while True:
             for ticker in DEFAULT_TICKERS:
                 try:
-                    price_data = MarketDataFetcher.get_price(ticker)
+                    price_data = await asyncio.to_thread(MarketDataFetcher.get_price, ticker)
                     # Cache in Redis
                     await self.cache_price(ticker, price_data)
                     # Publish to subscribers

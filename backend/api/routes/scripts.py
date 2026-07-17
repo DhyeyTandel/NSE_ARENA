@@ -182,7 +182,7 @@ plot(atrValue, title="ATR", color=color.orange, linewidth=2)
 # ── Endpoints ───────────────────────────────────────────────────────────────
 
 @router.post("/run")
-async def run_user_script(req: RunScriptRequest):
+async def run_user_script(req: RunScriptRequest, user=Depends(get_current_user)):
     """Execute a PineScript-lite program against market data."""
     if not req.code.strip():
         raise HTTPException(400, "Script code is empty")

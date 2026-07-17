@@ -63,18 +63,11 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
     db.add(user)
     await db.flush()
 
-    # Get or create active season
+    # Get active season
     result = await db.execute(select(Season).where(Season.is_active == True))
     season = result.scalar_one_or_none()
     if not season:
-        season = Season(
-            name="Season 1",
-            start_date=datetime.utcnow(),
-            end_date=datetime.utcnow() + timedelta(days=30),
-            starting_capital=STARTING_CAPITAL,
-        )
-        db.add(season)
-        await db.flush()
+        raise HTTPException(status_code=400, detail="No active season found. Registration is currently closed.")
 
     # Create portfolio for this season
     portfolio = Portfolio(
