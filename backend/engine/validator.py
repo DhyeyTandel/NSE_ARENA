@@ -27,15 +27,21 @@ class InsufficientSharesError(Exception):
 
 class Validator:
     def validate(self, order: Order, balance: float, holdings: dict,
-                 previous_close: float = None, market_price: float = 0.0) -> None:
+                 previous_close: float = None, market_price: float = 0.0,
+                 strict: bool = False) -> None:
         """
         Validate an order before it enters the matching engine.
         Raises specific exceptions on failure.
         market_price is the current market price, used for market orders
         where limit_price is 0.
+        strict=True refuses to silently skip the circuit breaker when
+        previous_close is missing/zero — use this for the live trade path,
+        where a cache entry without a reference price must not become a
+        way to bypass the breaker. Other callers keep the default lenient
+        behavior.
         """
         self._check_market_hours()
-        self._check_circuit_breaker(order, previous_close, market_price)
+        self._check_circuit_breaker(order, previous_close, market_price, strict=strict)
         if order.side == OrderSide.BUY:
             self._check_balance(order, balance, market_price)
         else:
@@ -57,9 +63,13 @@ class Validator:
             )
 
     def _check_circuit_breaker(self, order: Order, previous_close: float,
-                               market_price: float = 0.0) -> None:
+                               market_price: float = 0.0, strict: bool = False) -> None:
         """Reject orders ±10% from previous close"""
         if previous_close is None or previous_close == 0:
+            if strict:
+                raise CircuitBreakerError(
+                    "Reference price (previous close) unavailable — cannot verify circuit breaker"
+                )
             return
         price = order.limit_price if order.limit_price > 0 else market_price
         if price <= 0:

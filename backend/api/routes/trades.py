@@ -73,6 +73,23 @@ async def submit_trade(
     if current_price <= 0:
         raise HTTPException(status_code=400, detail=f"Invalid price for {request.ticker}")
 
+    # The circuit breaker needs a real previous_close — don't let a cache
+    # entry missing it silently bypass the breaker. Refetch a full quote
+    # instead of trusting the gap; reject the trade if even that comes up
+    # empty rather than trading on an unverifiable reference price.
+    previous_close = price_data.get("previous_close", 0.0) or 0.0
+    if previous_close <= 0:
+        try:
+            fresh_quote = await asyncio.to_thread(MarketDataFetcher.get_price, request.ticker)
+            previous_close = fresh_quote.get("previous_close", 0.0) or 0.0
+        except Exception:
+            previous_close = 0.0
+        if previous_close <= 0:
+            raise HTTPException(
+                status_code=503,
+                detail="reference price unavailable — cannot verify circuit breaker"
+            )
+
     # Build Order for validation
     engine_order = Order(
         user_id=str(user.id),
@@ -99,8 +116,9 @@ async def submit_trade(
             order=engine_order,
             balance=portfolio.cash_balance,
             holdings=holdings,
-            previous_close=price_data.get("previous_close", 0.0),
-            market_price=current_price
+            previous_close=previous_close,
+            market_price=current_price,
+            strict=True,
         )
     except (MarketClosedError, CircuitBreakerError, InsufficientBalanceError, InsufficientSharesError) as e:
         raise HTTPException(status_code=400, detail=str(e))
