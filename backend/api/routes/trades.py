@@ -73,8 +73,6 @@ async def submit_trade(
     if current_price <= 0:
         raise HTTPException(status_code=400, detail=f"Invalid price for {request.ticker}")
 
-    execution_price = request.limit_price if request.order_type == "limit" and request.limit_price > 0 else current_price
-
     # Build Order for validation
     engine_order = Order(
         user_id=str(user.id),
@@ -106,6 +104,24 @@ async def submit_trade(
         )
     except (MarketClosedError, CircuitBreakerError, InsufficientBalanceError, InsufficientSharesError) as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Determine fill price. We don't support resting orders: a limit order
+    # either fills immediately at the current market price (if the limit
+    # would be satisfied) or is rejected outright — it never fills at the
+    # user-specified limit_price itself, which would let users buy below
+    # (or sell above) market inside the circuit-breaker band.
+    if request.order_type == "limit":
+        if request.side == "buy" and request.limit_price < current_price:
+            raise HTTPException(
+                status_code=400,
+                detail="limit price below market — order would not fill"
+            )
+        if request.side == "sell" and request.limit_price > current_price:
+            raise HTTPException(
+                status_code=400,
+                detail="limit price above market — order would not fill"
+            )
+    execution_price = current_price
 
     # Calculate fees
     fees = fee_engine.calculate(
