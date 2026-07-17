@@ -100,14 +100,14 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
       top: 0,
       zIndex: 100,
       height: '56px',
-      background: scrolled ? 'rgba(8,9,10,0.85)' : 'var(--ink)',
+      background: scrolled ? 'rgba(244,240,233,0.85)' : 'var(--paper)',
       backdropFilter: scrolled ? 'blur(16px) saturate(1.2)' : 'none',
       WebkitBackdropFilter: scrolled ? 'blur(16px) saturate(1.2)' : 'none',
-      borderBottom: `1px solid ${scrolled ? 'var(--border2)' : 'var(--border)'}`,
+      borderBottom: `1px solid ${scrolled ? 'var(--faint)' : 'var(--faint)'}`,
       display: 'flex',
       alignItems: 'center',
       padding: '0 24px',
-      transition: 'all 0.3s var(--ease)',
+      transition: `all var(--dur) var(--ease-swift)`,
     }}>
       {/* Logo */}
       <div
@@ -118,19 +118,18 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
         onClick={() => onNavigate('dashboard')}
       >
         <div style={{
-          width: '28px', height: '28px', borderRadius: '8px',
-          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-solid) 100%)',
+          width: '28px', height: '28px', borderRadius: 'var(--r-input)',
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '14px', fontWeight: 700, color: '#000',
-          boxShadow: '0 2px 8px rgba(212,168,67,0.25)',
+          fontSize: '14px', fontWeight: 700, color: '#fff',
+          boxShadow: '0 2px 8px var(--accent-glow)',
         }}>
           N
         </div>
-        <div style={{
-          fontSize: '15px', fontWeight: 700,
-          letterSpacing: '-0.3px', color: 'var(--text)',
+        <div className="t-display" style={{
+          fontSize: '17px', fontWeight: 500,
         }}>
-          NSE <span style={{ color: 'var(--gold)' }}>Arena</span>
+          NSE <em>Arena</em>
         </div>
       </div>
 
@@ -145,29 +144,29 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '7px 14px',
-                fontSize: '12.5px', fontWeight: isActive ? 600 : 400,
-                color: isActive ? 'var(--text)' : 'var(--text3)',
-                background: isActive ? 'var(--ink3)' : 'transparent',
-                border: isActive ? '1px solid var(--border2)' : '1px solid transparent',
-                borderRadius: 'var(--r)',
+                fontSize: '12.5px', fontWeight: isActive ? 600 : 450,
+                color: isActive ? 'var(--ink)' : 'var(--muted)',
+                background: isActive ? 'var(--paper-lift)' : 'transparent',
+                border: isActive ? '1px solid var(--faint)' : '1px solid transparent',
+                borderRadius: 'var(--r-input)',
                 cursor: 'pointer',
-                transition: 'all 0.2s var(--ease)',
+                transition: `all var(--dur-fast) var(--ease-swift)`,
                 position: 'relative',
               }}
               onMouseEnter={e => {
                 if (!isActive) {
-                  e.currentTarget.style.color = 'var(--text2)';
-                  e.currentTarget.style.background = 'var(--ink2)';
+                  e.currentTarget.style.color = 'var(--body-color)';
+                  e.currentTarget.style.background = 'var(--paper-lift)';
                 }
               }}
               onMouseLeave={e => {
                 if (!isActive) {
-                  e.currentTarget.style.color = 'var(--text3)';
+                  e.currentTarget.style.color = 'var(--muted)';
                   e.currentTarget.style.background = 'transparent';
                 }
               }}
             >
-              <span style={{ opacity: isActive ? 1 : 0.5, transition: 'opacity 0.2s' }}>
+              <span style={{ opacity: isActive ? 1 : 0.5, transition: `opacity var(--dur-fast) var(--ease-swift)` }}>
                 {item.icon}
               </span>
               {item.label}
@@ -181,14 +180,14 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
         {/* Season badge */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '6px',
-          fontSize: '11px', color: 'var(--gold)',
-          background: 'var(--gold-dim)', border: '1px solid var(--gold-glow)',
-          padding: '4px 12px', borderRadius: 'var(--r4)',
-          fontFamily: 'DM Mono, monospace', fontWeight: 500,
+          fontSize: '11px', color: 'var(--accent)',
+          background: 'var(--accent-soft)', border: '1px solid var(--accent-glow)',
+          padding: '4px 12px', borderRadius: 'var(--r-pill)',
+          fontFamily: '"JetBrains Mono", monospace', fontWeight: 500,
         }}>
           <span style={{
             width: '5px', height: '5px', borderRadius: '50%',
-            background: 'var(--gold)',
+            background: 'var(--accent)',
             animation: 'pulse 2s infinite',
           }} />
           {seasonLabel}
@@ -197,13 +196,13 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
         {/* User avatar */}
         <div style={{
           width: '32px', height: '32px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--gold-dim) 0%, var(--ink3) 100%)',
-          border: '2px solid var(--gold-glow)',
+          background: 'linear-gradient(135deg, var(--accent-soft) 0%, var(--paper-lift) 100%)',
+          border: '2px solid var(--accent-glow)',
           fontSize: '11px', fontWeight: 600,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--gold)',
+          color: 'var(--accent)',
           cursor: 'pointer',
-          transition: 'all 0.2s var(--ease)',
+          transition: `all var(--dur-fast) var(--ease-swift)`,
         }}>
           {user?.initials || '??'}
         </div>
@@ -215,21 +214,21 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
             style={{
               padding: '5px 12px',
               fontSize: '11px', fontWeight: 500,
-              color: 'var(--text3)',
+              color: 'var(--muted)',
               background: 'transparent',
-              border: '1px solid var(--border2)',
-              borderRadius: 'var(--r)',
+              border: '1px solid var(--faint)',
+              borderRadius: 'var(--r-pill)',
               cursor: 'pointer',
-              transition: 'all 0.2s var(--ease)',
+              transition: `all var(--dur-fast) var(--ease-swift)`,
             }}
             onMouseEnter={e => {
-              e.target.style.color = 'var(--dn)';
-              e.target.style.borderColor = 'var(--dn-glow)';
-              e.target.style.background = 'var(--dn-dim)';
+              e.target.style.color = 'var(--error)';
+              e.target.style.borderColor = 'var(--error-glow)';
+              e.target.style.background = 'var(--error-soft)';
             }}
             onMouseLeave={e => {
-              e.target.style.color = 'var(--text3)';
-              e.target.style.borderColor = 'var(--border2)';
+              e.target.style.color = 'var(--muted)';
+              e.target.style.borderColor = 'var(--faint)';
               e.target.style.background = 'transparent';
             }}
           >

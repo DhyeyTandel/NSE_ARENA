@@ -244,7 +244,7 @@ export function ScriptEditor({ authenticated }) {
           onClick={handleSave}
           id="script-save-btn"
         >
-          💾 Save
+          Save
         </button>
 
         <button
@@ -280,14 +280,14 @@ export function ScriptEditor({ authenticated }) {
             />
           ) : (
             <div className="se-empty">
-              <div className="se-empty__icon">📊</div>
+              <div className="se-empty__icon">▢</div>
               <div className="se-empty__text">
                 Write a script and click <strong>▶ Run</strong> to see your indicator on the chart
               </div>
               <div style={{
                 fontSize: '10px',
-                color: 'var(--text3)',
-                fontFamily: 'DM Mono, monospace',
+                color: 'var(--muted)',
+                fontFamily: '"JetBrains Mono", monospace',
               }}>
                 ⌘+Enter to run
               </div>
@@ -328,7 +328,7 @@ export function ScriptEditor({ authenticated }) {
             </div>
           ))}
           {consoleLogs.length === 0 && (
-            <div className="se-console__line" style={{ color: 'var(--text3)' }}>
+            <div className="se-console__line" style={{ color: 'var(--muted)' }}>
               No output yet.
             </div>
           )}

@@ -51,35 +51,35 @@ export function Leaderboard() {
   const seasonInfo = season ? `${entries.length} traders · ${season.days_remaining} days remaining` : '47 traders · 14 days remaining';
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s var(--ease)' }}>
+    <div style={{ animation: 'fadeIn 0.3s var(--ease-swift)' }}>
       {/* Header */}
       <div style={{
         padding: '24px 24px 20px',
         display: 'flex', alignItems: 'center', gap: '14px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '1px solid var(--faint)',
       }}>
-        <div style={{ fontSize: '20px' }}>🏆</div>
+        <div style={{ fontSize: '20px', color: 'var(--accent)' }}>▲</div>
         <div>
-          <div style={{
-            fontSize: '20px', fontWeight: 700, letterSpacing: '-0.4px',
+          <div className="t-display" style={{
+            fontSize: '20px',
             display: 'flex', alignItems: 'center', gap: '10px',
           }}>
-            Season Leaderboard
+            Season leaderboard
             <span style={{
-              fontSize: '11px', fontWeight: 600, color: 'var(--gold)',
-              background: 'var(--gold-dim)', border: '1px solid var(--gold-glow)',
-              padding: '3px 10px', borderRadius: 'var(--r4)',
-              fontFamily: 'DM Mono, monospace',
+              fontSize: '11px', fontWeight: 600, color: 'var(--accent)',
+              background: 'var(--accent-soft)', border: '1px solid var(--accent-glow)',
+              padding: '3px 10px', borderRadius: 'var(--r-pill)',
+              fontFamily: '"JetBrains Mono", monospace',
             }}>{seasonName}</span>
             {!hasRealData && (
               <span style={{
-                fontSize: '10px', fontWeight: 500, color: 'var(--text3)',
-                background: 'var(--ink3)', border: '1px solid var(--border2)',
-                padding: '2px 8px', borderRadius: 'var(--r4)',
+                fontSize: '10px', fontWeight: 500, color: 'var(--muted)',
+                background: 'var(--paper-lift)', border: '1px solid var(--faint)',
+                padding: '2px 8px', borderRadius: 'var(--r-pill)',
               }}>Demo</span>
             )}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>
             {seasonInfo}
           </div>
         </div>
@@ -88,23 +88,20 @@ export function Leaderboard() {
       {/* Table wrapper */}
       <div style={{
         margin: '16px 24px 24px',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
       }}>
         {/* Column headers */}
         <div style={{
           display: 'grid', gridTemplateColumns: '40px 1fr 88px 80px 80px 80px',
           alignItems: 'center', padding: '10px 24px',
-          borderBottom: '1px solid var(--border2)',
-          background: 'var(--ink3)', gap: '8px',
+          borderBottom: '1px solid var(--faint)',
+          background: 'var(--paper-lift)', gap: '8px',
         }}>
           {['#', 'Trader', 'Score', 'Return', 'Drawdown', 'Value'].map(h => (
-            <div key={h} style={{
-              fontSize: '10px', fontWeight: 600, color: 'var(--text3)',
-              textTransform: 'uppercase', letterSpacing: '.08em',
-            }}>{h}</div>
+            <div key={h} className="t-label">{h}</div>
           ))}
         </div>
 

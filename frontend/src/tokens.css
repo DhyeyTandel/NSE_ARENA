@@ -1,57 +1,64 @@
-/* tokens.css — NSE Arena Design System */
+/* tokens.css — Dhyey Tandel design system */
 :root {
-  /* ── Backgrounds ── */
-  --ink:  #08090a;    /* app background — deep dark */
-  --ink2: #111214;    /* surface — cards, panels */
-  --ink3: #1a1b1f;    /* raised surface — inputs, hover states */
-  --ink4: #222328;    /* elevated — dropdowns, tooltips */
+  /* ── Canvas & surfaces (light — never pure white pages) ── */
+  --paper:      #F4F0E9;
+  --paper-lift: #FCFAF6;
+  --card:       #FFFFFF;
 
   /* ── Text ── */
-  --text:  #f0f0f2;   /* primary text */
-  --text2: #9a9ba6;   /* secondary — labels, subtitles */
-  --text3: #55566a;   /* tertiary — hints, placeholders */
-  --dim:   #3a3b48;   /* disabled / very muted */
+  --ink:         #17140F;
+  --ink-soft:    #2B2620;
+  --body-color:  #4B443A;
+  --muted:       #7C7367;
+  --muted-soft:  #A89E90;
 
-  /* ── Borders ── */
-  --border:  rgba(255,255,255,0.04);  /* default — subtle structure */
-  --border2: rgba(255,255,255,0.08);  /* emphasis — input outlines */
-  --border3: rgba(255,255,255,0.14);  /* strong — focused inputs */
+  /* ── Hairlines ── */
+  --faint:      #E6DFD2;
+  --faint-soft: #EFEAE0;
 
-  /* ── Signature accent — warm gold ── */
-  --gold:      #d4a843;
-  --gold-dim:  rgba(212,168,67,0.08);
-  --gold-glow: rgba(212,168,67,0.20);
-  --gold-solid: #b8922d;
+  /* ── Signal orange — the one bright ── */
+  --accent:      #EE5308;
+  --accent-deep: #C24303;
+  --accent-soft: #FBE6D9;
+  --accent-glow: rgba(238,83,8,0.20);
+
+  /* ── Supporting brights (data-viz / category coding only) ── */
+  --blurple:      #5B4DF2;
+  --blurple-soft: #E7E4FD;
+  --blurple-glow: rgba(91,77,242,0.20);
+  --magenta:      #DE3D9E;
+  --magenta-soft: #FBE2F1;
+  --magenta-glow: rgba(222,61,158,0.20);
+
+  /* ── Warm-black ink band (footer, featured card, inversions) ── */
+  --ink-surface:   #17140F;
+  --on-ink:        #F4F0E9;
+  --on-ink-muted:  #A89E90;
 
   /* ── Semantic ── */
-  --up:   #22c982;    /* gains, buy, positive */
-  --dn:   #ef4444;    /* losses, sell, negative */
-  --blue: #6c9eff;    /* AI agent, info accent */
+  --success:      #1E8A5A;
+  --success-soft: rgba(30,138,90,0.08);
+  --success-glow: rgba(30,138,90,0.20);
+  --error:        #D0342C;
+  --error-soft:   rgba(208,52,44,0.08);
+  --error-glow:   rgba(208,52,44,0.20);
 
-  /* ── Derived fills ── */
-  --up-dim:   rgba(34,201,130,0.08);
-  --dn-dim:   rgba(239,68,68,0.08);
-  --blue-dim: rgba(108,158,255,0.08);
-  --up-glow:   rgba(34,201,130,0.20);
-  --dn-glow:   rgba(239,68,68,0.20);
-  --blue-glow: rgba(108,158,255,0.20);
-
-  /* ── Glass ── */
-  --glass:        rgba(17,18,20,0.70);
-  --glass-border: rgba(255,255,255,0.06);
+  /* ── Glass (translucent overlays) ── */
+  --glass:        rgba(252,250,246,0.72);
+  --glass-border: rgba(23,20,15,0.06);
   --glass-blur:   16px;
 
-  /* ── Shadows ── */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.2);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.25);
-  --shadow-gold: 0 4px 24px rgba(212,168,67,0.15);
+  /* ── Elevation (mostly flat; hairlines delineate) ── */
+  --shadow-soft:   0 4px 24px rgba(23,20,15,.05);
+  --shadow-halo:   0 2px 4px rgba(23,20,15,.04), 0 24px 48px rgba(23,20,15,.08);
+  --shadow-lift:   0 8px 16px rgba(23,20,15,.06), 0 32px 64px rgba(23,20,15,.12);
+  --shadow-accent: 0 4px 24px var(--accent-glow);
 
-  /* ── Radius ── */
-  --r:  8px;   /* inputs, tags, small elements */
-  --r2: 12px;  /* cards, panels */
-  --r3: 16px;  /* modals, large containers */
-  --r4: 24px;  /* pills, badges */
+  /* ── Shape ── */
+  --r-card:  4px;
+  --r-input: 8px;
+  --r-media: 24px;
+  --r-pill:  999px;
 
   /* ── Spacing scale ── */
   --s1: 4px;
@@ -64,21 +71,77 @@
   --s8: 48px;
   --s9: 64px;
 
-  /* ── Transitions ── */
-  --ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ── Motion ── */
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --ease-swift:  cubic-bezier(.2,.7,.2,1);
+  --dur-fast: .18s;
+  --dur:      .32s;
+  --dur-slow: .6s;
+}
+
+/* ── Dark theme (warm-black, not pure black) ── */
+:root[data-theme="dark"] {
+  --paper:      #17140F;
+  --paper-lift: #1E1912;
+  --card:       #201B13;
+
+  --ink:        #F4F0E9;
+  --ink-soft:   #EFEAE0;
+  --body-color: #C9C0B2;
+  --muted:      #A89E90;
+  --muted-soft: #6E6455;
+
+  --faint:      #332D23;
+  --faint-soft: #2A2519;
+
+  --accent-soft: #3A2313;
+  --accent-deep: #FF8A4D;
+
+  --blurple-soft: #242046;
+  --magenta-soft: #3A1C2E;
+
+  --ink-surface: #0F0C08;
+
+  /* --accent / --blurple / --magenta stay identical in dark */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #17140F;
+    --paper-lift: #1E1912;
+    --card:       #201B13;
+
+    --ink:        #F4F0E9;
+    --ink-soft:   #EFEAE0;
+    --body-color: #C9C0B2;
+    --muted:      #A89E90;
+    --muted-soft: #6E6455;
+
+    --faint:      #332D23;
+    --faint-soft: #2A2519;
+
+    --accent-soft: #3A2313;
+    --accent-deep: #FF8A4D;
+
+    --blurple-soft: #242046;
+    --magenta-soft: #3A1C2E;
+
+    --ink-surface: #0F0C08;
+  }
 }
 
 /* ── Apply globally ── */
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Sofia Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 450;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--ink);
-  color: var(--text);
+  background: var(--paper);
+  color: var(--ink);
   margin: 0;
   padding: 0;
-  line-height: 1.5;
+  line-height: 1.6;
+  transition: background var(--dur) var(--ease-swift), color var(--dur) var(--ease-swift);
 }
 
 /* ── Reset ── */
@@ -86,73 +149,116 @@ body {
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; }
 
-/* ── Type Scale ── */
+/* ── Type scale ── */
+.t-display {
+  font-family: "Newsreader", Georgia, serif;
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.t-display em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.t-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.t-eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
 .t-label {
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text3);
+  color: var(--muted);
 }
 
 .t-body {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text2);
-  line-height: 1.65;
+  font-size: 16.5px;
+  font-weight: 450;
+  color: var(--body-color);
+  line-height: 1.6;
 }
 
 .t-strong {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--ink);
 }
 
 .t-title {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.4px;
-  color: var(--text);
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .t-kpi {
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 28px;
   font-weight: 400;
-  letter-spacing: -0.5px;
-  color: var(--text);
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .t-mono {
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 13px;
   font-weight: 400;
-  color: var(--text2);
+  color: var(--body-color);
 }
 
 .t-mono-sm {
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   font-weight: 400;
-  color: var(--text3);
+  color: var(--muted);
 }
 
 /* ── Semantic color modifiers ── */
-.up   { color: var(--up); }
-.dn   { color: var(--dn); }
-.gold { color: var(--gold); }
-.blue { color: var(--blue); }
+.up   { color: var(--success); }
+.dn   { color: var(--error); }
+.gold { color: var(--accent); }
+.blue { color: var(--blurple); }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--dim);
+  background: var(--muted-soft);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
-/* ── Animations ── */
+/* ── Motion (respect reduced-motion) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -184,10 +290,15 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(212,168,67,0.15); }
-  50%      { box-shadow: 0 0 20px rgba(212,168,67,0.25); }
+  0%, 100% { box-shadow: 0 0 8px var(--accent-glow); }
+  50%      { box-shadow: 0 0 20px var(--accent-glow); }
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }

@@ -59,8 +59,8 @@ export function AuthScreen({ onAuth, error, clearError }) {
         {/* Logo */}
         <div className="auth-logo">
           <div className="auth-logo-icon">N</div>
-          <div className="auth-logo-text">
-            NSE <span className="gold">Arena</span>
+          <div className="auth-logo-text t-display">
+            NSE <em>Arena</em>
           </div>
         </div>
         <div className="auth-subtitle">
@@ -146,9 +146,9 @@ export function AuthScreen({ onAuth, error, clearError }) {
             <span className="auth-feature-chip">
               <span className="mono">₹1,00,000</span> virtual capital
             </span>
-            <span className="auth-feature-chip">📡 Live NSE data</span>
-            <span className="auth-feature-chip">🤖 AI competitors</span>
-            <span className="auth-feature-chip">🏆 Seasonal leagues</span>
+            <span className="auth-feature-chip">◆ Live NSE data</span>
+            <span className="auth-feature-chip">◆ AI competitors</span>
+            <span className="auth-feature-chip">◆ Seasonal leagues</span>
           </div>
         </div>
       </div>

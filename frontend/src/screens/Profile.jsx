@@ -67,32 +67,32 @@ export function Profile({ authenticated, user }) {
   const strokeDashoffset = circumference * (1 - scorePercent);
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s var(--ease)' }}>
+    <div style={{ animation: 'fadeIn 0.3s var(--ease-swift)' }}>
       {/* Profile header */}
       <div style={{
         padding: '32px 24px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '1px solid var(--faint)',
         display: 'flex', alignItems: 'center', gap: '24px',
-        animation: 'fadeInUp 0.4s var(--ease)',
+        animation: 'fadeInUp 0.4s var(--ease-swift)',
       }}>
         {/* Avatar */}
         <div style={{
           width: '64px', height: '64px', borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '22px', fontWeight: 700, flexShrink: 0,
-          background: 'linear-gradient(135deg, var(--gold-dim) 0%, var(--ink3) 100%)',
-          border: '3px solid var(--gold-glow)',
-          color: 'var(--gold)',
-          boxShadow: 'var(--shadow-gold)',
+          background: 'linear-gradient(135deg, var(--accent-soft) 0%, var(--paper-lift) 100%)',
+          border: '3px solid var(--accent-glow)',
+          color: 'var(--accent)',
+          boxShadow: 'var(--shadow-accent)',
         }}>
           {displayUser.initials}
         </div>
 
         <div>
-          <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.4px' }}>
+          <div className="t-display" style={{ fontSize: '24px' }}>
             {displayUser.username}
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '3px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '3px' }}>
             {displayUser.email || 'Paper trader · NSE Arena'}
           </div>
         </div>
@@ -100,14 +100,14 @@ export function Profile({ authenticated, user }) {
         {/* Score ring */}
         <div style={{ marginLeft: 'auto', textAlign: 'center', position: 'relative' }}>
           <svg width="110" height="110" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="55" cy="55" r="52" fill="none" stroke="var(--ink3)" strokeWidth="5" />
+            <circle cx="55" cy="55" r="52" fill="none" stroke="var(--faint)" strokeWidth="5" />
             <circle
               cx="55" cy="55" r="52" fill="none"
-              stroke="var(--gold)" strokeWidth="5"
+              stroke="var(--accent)" strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
-              style={{ transition: 'stroke-dashoffset 1.2s var(--ease)' }}
+              style={{ transition: `stroke-dashoffset 1.2s var(--ease-swift)` }}
             />
           </svg>
           <div style={{
@@ -115,14 +115,14 @@ export function Profile({ authenticated, user }) {
             transform: 'translate(-50%, -50%)',
           }}>
             <div style={{
-              fontFamily: 'DM Mono, monospace', fontSize: '28px',
-              fontWeight: 400, color: 'var(--gold)', lineHeight: 1,
+              fontFamily: '"JetBrains Mono", monospace', fontSize: '28px',
+              fontWeight: 400, color: 'var(--accent)', lineHeight: 1,
             }}>
               {finalScore}
             </div>
             <div style={{
-              fontSize: '10px', fontWeight: 600, color: 'var(--gold)',
-              marginTop: '2px', fontFamily: 'DM Mono, monospace',
+              fontSize: '10px', fontWeight: 600, color: 'var(--accent)',
+              marginTop: '2px', fontFamily: '"JetBrains Mono", monospace',
               letterSpacing: '.06em', textTransform: 'uppercase',
             }}>
               {grade}
@@ -135,9 +135,9 @@ export function Profile({ authenticated, user }) {
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
         margin: '16px 24px 0',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
       }}>
         <KpiCard
@@ -157,9 +157,9 @@ export function Profile({ authenticated, user }) {
       {/* Score breakdown */}
       <div style={{
         margin: '16px 24px 0',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
       }}>
         <TraderScoreCard score={finalScore} grade={grade} breakdown={animatedScores} />
@@ -168,9 +168,9 @@ export function Profile({ authenticated, user }) {
       {/* Season history */}
       <div style={{
         margin: '16px 24px 24px',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
       }}>
         <SeasonHistory seasons={DEMO_SEASONS} />

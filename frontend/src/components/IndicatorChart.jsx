@@ -33,29 +33,29 @@ export function IndicatorChart({ ohlcv = [], plots = [], hlines = [], height = 4
       width: mainRef.current.clientWidth,
       height: showPane ? Math.floor(height * 0.6) : height,
       layout: {
-        background: { color: '#0a0a0b' },
-        textColor: '#52525b',
-        fontFamily: 'DM Mono, monospace',
+        background: { color: '#FFFFFF' },
+        textColor: '#7C7367',
+        fontFamily: '"JetBrains Mono", monospace',
       },
       grid: {
-        vertLines: { color: '#ffffff06' },
-        horzLines: { color: '#ffffff06' },
+        vertLines: { color: '#17140F0A' },
+        horzLines: { color: '#17140F0A' },
       },
       crosshair: { mode: 0 },
-      rightPriceScale: { borderColor: '#ffffff09' },
-      timeScale: { borderColor: '#ffffff09', timeVisible: false },
+      rightPriceScale: { borderColor: '#17140F14' },
+      timeScale: { borderColor: '#17140F14', timeVisible: false },
     });
     chartRef.current = chart;
 
     // Candlestick series
     if (ohlcv.length > 0) {
       const candlestick = chart.addSeries(CandlestickSeries, {
-        upColor: '#34d399',
-        downColor: '#f87171',
-        borderUpColor: '#34d399',
-        borderDownColor: '#f87171',
-        wickUpColor: '#34d39966',
-        wickDownColor: '#f8717166',
+        upColor: '#1E8A5A',
+        downColor: '#D0342C',
+        borderUpColor: '#1E8A5A',
+        borderDownColor: '#D0342C',
+        wickUpColor: '#1E8A5A66',
+        wickDownColor: '#D0342C66',
       });
       candlestick.setData(ohlcv);
     }
@@ -66,7 +66,7 @@ export function IndicatorChart({ ohlcv = [], plots = [], hlines = [], height = 4
       const SeriesType = SERIES_FACTORY[plot.style] || LineSeries;
 
       const seriesOpts = {
-        color: plot.color || '#c9a84c',
+        color: plot.color || '#EE5308',
         lineWidth: plot.linewidth || 2,
         title: plot.title,
         priceLineVisible: false,
@@ -108,17 +108,17 @@ export function IndicatorChart({ ohlcv = [], plots = [], hlines = [], height = 4
       width: paneRef.current.clientWidth,
       height: Math.floor(height * 0.38),
       layout: {
-        background: { color: '#0a0a0b' },
-        textColor: '#52525b',
-        fontFamily: 'DM Mono, monospace',
+        background: { color: '#FFFFFF' },
+        textColor: '#7C7367',
+        fontFamily: '"JetBrains Mono", monospace',
       },
       grid: {
-        vertLines: { color: '#ffffff06' },
-        horzLines: { color: '#ffffff06' },
+        vertLines: { color: '#17140F0A' },
+        horzLines: { color: '#17140F0A' },
       },
       crosshair: { mode: 0 },
-      rightPriceScale: { borderColor: '#ffffff09' },
-      timeScale: { borderColor: '#ffffff09', timeVisible: false },
+      rightPriceScale: { borderColor: '#17140F14' },
+      timeScale: { borderColor: '#17140F14', timeVisible: false },
     });
     paneChartRef.current = chart;
 
@@ -127,7 +127,7 @@ export function IndicatorChart({ ohlcv = [], plots = [], hlines = [], height = 4
       const SeriesType = SERIES_FACTORY[plot.style] || LineSeries;
 
       const seriesOpts = {
-        color: plot.color || '#c9a84c',
+        color: plot.color || '#EE5308',
         lineWidth: plot.linewidth || 2,
         title: plot.title,
         priceLineVisible: false,
@@ -151,7 +151,7 @@ export function IndicatorChart({ ohlcv = [], plots = [], hlines = [], height = 4
           value: hl.price,
         }));
         const hlSeries = chart.addSeries(LineSeries, {
-          color: hl.color || '#52525b',
+          color: hl.color || '#A89E90',
           lineWidth: 1,
           lineStyle: 2, // dashed
           title: hl.title || '',
@@ -189,7 +189,7 @@ export function IndicatorChart({ ohlcv = [], plots = [], hlines = [], height = 4
         <>
           <div style={{
             height: '1px',
-            background: 'var(--border2)',
+            background: 'var(--faint)',
             margin: '2px 0',
           }} />
           <div ref={paneRef} style={{

@@ -26,7 +26,7 @@ function App() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'var(--ink)',
+        background: 'var(--paper)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -34,25 +34,22 @@ function App() {
         gap: '16px',
       }}>
         <div style={{
-          width: '40px', height: '40px', borderRadius: '10px',
-          background: 'linear-gradient(135deg, var(--gold) 0%, var(--gold-solid) 100%)',
+          width: '40px', height: '40px', borderRadius: 'var(--r-input)',
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '20px', fontWeight: 800, color: '#000',
+          fontSize: '20px', fontWeight: 800, color: '#fff',
           animation: 'glowPulse 1.5s ease-in-out infinite',
-          boxShadow: 'var(--shadow-gold)',
+          boxShadow: 'var(--shadow-accent)',
         }}>
           N
         </div>
-        <div style={{
-          fontSize: '15px', fontWeight: 600, color: 'var(--text)',
-          letterSpacing: '-0.3px',
-        }}>
-          NSE <span style={{ color: 'var(--gold)' }}>Arena</span>
+        <div className="t-display" style={{ fontSize: '17px' }}>
+          NSE <em>Arena</em>
         </div>
         <div style={{
           width: '24px', height: '24px',
-          border: '2px solid var(--border2)',
-          borderTopColor: 'var(--gold)',
+          border: '2px solid var(--faint)',
+          borderTopColor: 'var(--accent)',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }} />
@@ -92,8 +89,8 @@ function App() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'var(--ink)',
-      color: 'var(--text)',
+      background: 'var(--paper)',
+      color: 'var(--ink)',
     }}>
       <NavBar
         activeScreen={activeScreen}

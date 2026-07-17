@@ -27,36 +27,36 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
       width: containerRef.current.clientWidth,
       height: height,
       layout: {
-        background: { color: '#0a0a0b' },
-        textColor: '#71717a',
-        fontFamily: "'DM Mono', 'SF Mono', monospace",
+        background: { color: '#FFFFFF' },
+        textColor: '#7C7367',
+        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(255,255,255,0.03)' },
-        horzLines: { color: 'rgba(255,255,255,0.03)' },
+        vertLines: { color: 'rgba(23,20,15,0.04)' },
+        horzLines: { color: 'rgba(23,20,15,0.04)' },
       },
       crosshair: {
         mode: 0,
         vertLine: {
-          color: 'rgba(255,255,255,0.15)',
+          color: 'rgba(23,20,15,0.2)',
           width: 1,
           style: 2,
-          labelBackgroundColor: '#27272a',
+          labelBackgroundColor: '#2B2620',
         },
         horzLine: {
-          color: 'rgba(255,255,255,0.15)',
+          color: 'rgba(23,20,15,0.2)',
           width: 1,
           style: 2,
-          labelBackgroundColor: '#27272a',
+          labelBackgroundColor: '#2B2620',
         },
       },
       rightPriceScale: {
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(23,20,15,0.08)',
         scaleMargins: { top: 0.1, bottom: 0.25 },
       },
       timeScale: {
-        borderColor: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(23,20,15,0.08)',
         timeVisible: true,
         secondsVisible: false,
         barSpacing: 8,
@@ -70,12 +70,12 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
 
     // Candlestick series
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#34d399',
-      downColor: '#f87171',
-      borderUpColor: '#34d399',
-      borderDownColor: '#f87171',
-      wickUpColor: 'rgba(52,211,153,0.5)',
-      wickDownColor: 'rgba(248,113,113,0.5)',
+      upColor: '#1E8A5A',
+      downColor: '#D0342C',
+      borderUpColor: '#1E8A5A',
+      borderDownColor: '#D0342C',
+      wickUpColor: 'rgba(30,138,90,0.5)',
+      wickDownColor: 'rgba(208,52,44,0.5)',
     });
 
     // Volume series
@@ -114,8 +114,8 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
             time: bar.date || bar.time,
             value: bar.volume,
             color: bar.close >= bar.open
-              ? 'rgba(52,211,153,0.25)'
-              : 'rgba(248,113,113,0.25)',
+              ? 'rgba(30,138,90,0.25)'
+              : 'rgba(208,52,44,0.25)',
           }));
 
           candleSeries.setData(candleData);
@@ -158,7 +158,7 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
         style={{
           width: '100%',
           height: '100%',
-          borderRadius: 'var(--r2, 8px)',
+          borderRadius: 'var(--r-card, 4px)',
           overflow: 'hidden',
         }}
       />
@@ -168,22 +168,22 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(10,10,11,0.8)',
-          borderRadius: 'var(--r2, 8px)',
+          background: 'rgba(244,240,233,0.85)',
+          borderRadius: 'var(--r-card, 4px)',
         }}>
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
           }}>
             <div style={{
               width: '24px', height: '24px',
-              border: '2px solid rgba(255,255,255,0.1)',
-              borderTopColor: '#c9a227',
+              border: '2px solid rgba(23,20,15,0.1)',
+              borderTopColor: '#EE5308',
               borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
             }} />
             <span style={{
-              fontSize: '11px', color: '#71717a',
-              fontFamily: "'DM Mono', monospace",
+              fontSize: '11px', color: '#7C7367',
+              fontFamily: "'JetBrains Mono', monospace",
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
             }}>
@@ -198,12 +198,12 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(10,10,11,0.8)',
-          borderRadius: 'var(--r2, 8px)',
+          background: 'rgba(244,240,233,0.85)',
+          borderRadius: 'var(--r-card, 4px)',
         }}>
           <span style={{
-            fontSize: '12px', color: '#f87171',
-            fontFamily: "'DM Mono', monospace",
+            fontSize: '12px', color: '#D0342C',
+            fontFamily: "'JetBrains Mono', monospace",
           }}>
             {error}
           </span>

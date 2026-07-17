@@ -1,7 +1,7 @@
 // components/MonacoEditor.jsx
 /**
  * Monaco Editor wrapper with custom PineScript-lite language support.
- * Provides syntax highlighting, auto-completion, and dark theme matching the app.
+ * Provides syntax highlighting, auto-completion, and a theme matching the app.
  */
 import { useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
@@ -239,41 +239,41 @@ function registerPineScript(monaco) {
 
   // ── Theme ────────────────────────────────────────────────────────────
 
-  monaco.editor.defineTheme('pine-dark', {
-    base: 'vs-dark',
+  monaco.editor.defineTheme('pine', {
+    base: 'vs',
     inherit: true,
     rules: [
-      { token: 'comment', foreground: '52525b', fontStyle: 'italic' },
-      { token: 'comment.directive', foreground: '52525b', fontStyle: 'italic' },
-      { token: 'keyword', foreground: 'c9a84c' },
-      { token: 'number', foreground: '34d399' },
-      { token: 'number.float', foreground: '34d399' },
-      { token: 'string', foreground: 'fb923c' },
-      { token: 'variable.predefined', foreground: '60a5fa' },
-      { token: 'support.function', foreground: 'a78bfa' },
-      { token: 'constant.color', foreground: 'e879f9' },
-      { token: 'constant.style', foreground: 'e879f9' },
-      { token: 'operator', foreground: 'a1a1aa' },
-      { token: 'delimiter', foreground: '71717a' },
-      { token: 'identifier', foreground: 'fafafa' },
+      { token: 'comment', foreground: '8A8072', fontStyle: 'italic' },
+      { token: 'comment.directive', foreground: '8A8072', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'C24303' },
+      { token: 'number', foreground: '1E8A5A' },
+      { token: 'number.float', foreground: '1E8A5A' },
+      { token: 'string', foreground: 'B82E80' },
+      { token: 'variable.predefined', foreground: '5B4DF2' },
+      { token: 'support.function', foreground: '4438D6' },
+      { token: 'constant.color', foreground: 'DE3D9E' },
+      { token: 'constant.style', foreground: 'DE3D9E' },
+      { token: 'operator', foreground: '7C7367' },
+      { token: 'delimiter', foreground: 'A89E90' },
+      { token: 'identifier', foreground: '17140F' },
     ],
     colors: {
-      'editor.background': '#0a0a0b',
-      'editor.foreground': '#fafafa',
-      'editor.lineHighlightBackground': '#18181b',
-      'editor.selectionBackground': '#c9a84c30',
-      'editor.inactiveSelectionBackground': '#c9a84c15',
-      'editorCursor.foreground': '#c9a84c',
-      'editorIndentGuide.background': '#ffffff09',
-      'editorIndentGuide.activeBackground': '#ffffff14',
-      'editorLineNumber.foreground': '#3f3f46',
-      'editorLineNumber.activeForeground': '#a1a1aa',
-      'editorWidget.background': '#18181b',
-      'editorWidget.border': '#ffffff14',
-      'editorSuggestWidget.background': '#18181b',
-      'editorSuggestWidget.border': '#ffffff14',
-      'editorSuggestWidget.selectedBackground': '#27272a',
-      'list.hoverBackground': '#27272a',
+      'editor.background': '#FFFFFF',
+      'editor.foreground': '#17140F',
+      'editor.lineHighlightBackground': '#FCFAF6',
+      'editor.selectionBackground': '#EE530825',
+      'editor.inactiveSelectionBackground': '#EE530812',
+      'editorCursor.foreground': '#EE5308',
+      'editorIndentGuide.background': '#17140F0D',
+      'editorIndentGuide.activeBackground': '#17140F1F',
+      'editorLineNumber.foreground': '#C9C0B2',
+      'editorLineNumber.activeForeground': '#4B443A',
+      'editorWidget.background': '#FFFFFF',
+      'editorWidget.border': '#E6DFD2',
+      'editorSuggestWidget.background': '#FFFFFF',
+      'editorSuggestWidget.border': '#E6DFD2',
+      'editorSuggestWidget.selectedBackground': '#FBE6D9',
+      'list.hoverBackground': '#FCFAF6',
     },
   });
 }
@@ -287,21 +287,21 @@ export function MonacoEditor({ value, onChange, height = '100%' }) {
   const handleMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     registerPineScript(monaco);
-    monaco.editor.setTheme('pine-dark');
+    monaco.editor.setTheme('pine');
   }, []);
 
   return (
     <Editor
       height={height}
       language={PINE_LANG_ID}
-      theme="pine-dark"
+      theme="pine"
       value={value}
       onChange={onChange}
       beforeMount={registerPineScript}
       onMount={handleMount}
       options={{
         fontSize: 13,
-        fontFamily: "'DM Mono', 'Fira Code', monospace",
+        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
         fontLigatures: true,
         lineNumbers: 'on',
         minimap: { enabled: false },

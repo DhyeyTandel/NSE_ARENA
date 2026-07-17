@@ -9,7 +9,7 @@ const DEMO_AI_FEED = [
     confidence: 78,
     stats: [
       { label: 'Position', value: '₹42,705 (15.2%)', highlight: null },
-      { label: 'Stop loss', value: '₹2,790', highlight: 'var(--dn)' },
+      { label: 'Stop loss', value: '₹2,790', highlight: 'var(--error)' },
     ],
     status: '✓ Executed',
   },
@@ -19,7 +19,7 @@ const DEMO_AI_FEED = [
     confidence: 45,
     stats: [
       { label: 'Portfolio', value: '₹1,05,100', highlight: null },
-      { label: 'Day P&L', value: '-₹340', highlight: 'var(--dn)' },
+      { label: 'Day P&L', value: '-₹340', highlight: 'var(--error)' },
     ],
     status: null,
   },
@@ -28,7 +28,7 @@ const DEMO_AI_FEED = [
     reasoning: 'HDFC Bank has hit my take-profit target at ₹1,640. The position was entered at ₹1,580 and has delivered a clean 3.8% return. Taking profits here.',
     confidence: 82,
     stats: [
-      { label: 'P&L', value: '+₹496 (+3.8%)', highlight: 'var(--up)' },
+      { label: 'P&L', value: '+₹496 (+3.8%)', highlight: 'var(--success)' },
       { label: 'Hold time', value: '6 days', highlight: null },
     ],
     status: '✓ Executed',
@@ -39,7 +39,7 @@ const DEMO_AI_FEED = [
     confidence: 71,
     stats: [
       { label: 'Position', value: '₹18,240 (6.5%)', highlight: null },
-      { label: 'Stop loss', value: '₹1,480', highlight: 'var(--dn)' },
+      { label: 'Stop loss', value: '₹1,480', highlight: 'var(--error)' },
     ],
     status: '✓ Executed',
   },
@@ -67,11 +67,11 @@ export function AIFeed() {
                 confidence: Math.round((d.confidence || 0) * 100),
                 stats: [
                   d.position_size_pct != null ? { label: 'Position size', value: `${(d.position_size_pct * 100).toFixed(1)}%`, highlight: null } : null,
-                  d.stop_loss_price ? { label: 'Stop loss', value: `₹${d.stop_loss_price.toLocaleString('en-IN')}`, highlight: 'var(--dn)' } : null,
-                  d.guardrail_status === 'blocked' ? { label: 'Guardrail', value: 'Blocked', highlight: 'var(--dn)' } : null,
+                  d.stop_loss_price ? { label: 'Stop loss', value: `₹${d.stop_loss_price.toLocaleString('en-IN')}`, highlight: 'var(--error)' } : null,
+                  d.guardrail_status === 'blocked' ? { label: 'Guardrail', value: 'Blocked', highlight: 'var(--error)' } : null,
                 ].filter(Boolean),
                 status: d.guardrail_status === 'blocked'
-                  ? `⛔ ${d.guardrail_reason || 'Blocked'}`
+                  ? `Blocked — ${d.guardrail_reason || 'guardrail'}`
                   : (d.action !== 'hold' ? '✓ Executed' : null),
               };
             });
@@ -85,43 +85,43 @@ export function AIFeed() {
   }, []);
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s var(--ease)' }}>
+    <div style={{ animation: 'fadeIn 0.3s var(--ease-swift)' }}>
       {/* Header */}
       <div style={{
         padding: '24px 24px 20px',
         display: 'flex', alignItems: 'center', gap: '14px',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '1px solid var(--faint)',
       }}>
         {/* Bot avatar */}
         <div style={{
           width: '42px', height: '42px', borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '12px', fontWeight: 700,
-          background: 'linear-gradient(135deg, var(--blue-dim) 0%, var(--ink3) 100%)',
-          border: '2px solid var(--blue-glow)',
-          color: 'var(--blue)',
+          background: 'linear-gradient(135deg, var(--blurple-soft) 0%, var(--paper-lift) 100%)',
+          border: '2px solid var(--blurple-glow)',
+          color: 'var(--blurple)',
         }}>AB</div>
 
         <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: '20px', fontWeight: 700, letterSpacing: '-0.4px',
+          <div className="t-display" style={{
+            fontSize: '20px',
             display: 'flex', alignItems: 'center', gap: '8px',
           }}>
-            AI Trading Intelligence
+            AI trading intelligence
             <span style={{
-              fontSize: '10px', fontWeight: 600, color: 'var(--blue)',
-              background: 'var(--blue-dim)', border: '1px solid var(--blue-glow)',
-              padding: '2px 8px', borderRadius: 'var(--r4)',
+              fontSize: '10px', fontWeight: 600, color: 'var(--blurple)',
+              background: 'var(--blurple-soft)', border: '1px solid var(--blurple-glow)',
+              padding: '2px 8px', borderRadius: 'var(--r-pill)',
             }}>Gemini</span>
             {!hasRealData && (
               <span style={{
-                fontSize: '10px', fontWeight: 500, color: 'var(--text3)',
-                background: 'var(--ink3)', border: '1px solid var(--border2)',
-                padding: '2px 8px', borderRadius: 'var(--r4)',
+                fontSize: '10px', fontWeight: 500, color: 'var(--muted)',
+                background: 'var(--paper-lift)', border: '1px solid var(--faint)',
+                padding: '2px 8px', borderRadius: 'var(--r-pill)',
               }}>Demo</span>
             )}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '3px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '3px' }}>
             {hasRealData
               ? `${feed.length} decisions logged`
               : 'Watch how our AI agent reasons through every trade decision'}
@@ -131,12 +131,12 @@ export function AIFeed() {
         {/* Stats */}
         <div style={{ display: 'flex', gap: '20px' }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Return</div>
-            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 400, color: 'var(--up)' }}>+6.2%</div>
+            <div className="t-label">Return</div>
+            <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '16px', fontWeight: 400, color: 'var(--success)' }}>+6.2%</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Score</div>
-            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: '16px', fontWeight: 400, color: 'var(--blue)' }}>764</div>
+            <div className="t-label">Score</div>
+            <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '16px', fontWeight: 400, color: 'var(--blurple)' }}>764</div>
           </div>
         </div>
       </div>

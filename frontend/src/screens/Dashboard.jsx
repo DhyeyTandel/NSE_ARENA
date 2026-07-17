@@ -85,17 +85,17 @@ export function Dashboard({ authenticated, user }) {
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s var(--ease)' }}>
+    <div style={{ animation: 'fadeIn 0.3s var(--ease-swift)' }}>
       {/* Greeting */}
       <div style={{
         padding: '20px 24px 0',
         display: 'flex', alignItems: 'baseline', gap: '8px',
-        animation: 'fadeInUp 0.4s var(--ease)',
+        animation: 'fadeInUp 0.4s var(--ease-swift)',
       }}>
-        <div style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.3px' }}>
-          {getGreeting()}, <span style={{ color: 'var(--gold)' }}>{user?.username || 'Trader'}</span>
+        <div className="t-display" style={{ fontSize: '20px' }}>
+          {getGreeting()}, <em>{user?.username || 'Trader'}</em>
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--text3)', marginLeft: '4px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--muted)', marginLeft: '4px' }}>
           {today}
         </div>
       </div>
@@ -104,9 +104,9 @@ export function Dashboard({ authenticated, user }) {
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
         margin: '16px 24px 0',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
       }}>
         <KpiCard
@@ -140,33 +140,33 @@ export function Dashboard({ authenticated, user }) {
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 340px',
         margin: '16px 24px 0',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
-        animation: 'fadeInUp 0.5s var(--ease) 0.1s both',
+        animation: 'fadeInUp 0.5s var(--ease-swift) 0.1s both',
       }}>
         {/* Chart area */}
-        <div style={{ padding: '20px 22px', borderRight: '1px solid var(--border2)' }}>
+        <div style={{ padding: '20px 22px', borderRight: '1px solid var(--faint)' }}>
           {/* Ticker header */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px',
           }}>
-            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.4px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>
               {selectedTicker}
             </div>
             <div style={{
-              fontFamily: 'DM Mono, monospace', fontSize: '16px',
+              fontFamily: '"JetBrains Mono", monospace', fontSize: '16px',
               fontWeight: 400,
-              color: displayChangePct >= 0 ? 'var(--up)' : 'var(--dn)',
+              color: displayChangePct >= 0 ? 'var(--success)' : 'var(--error)',
             }}>
               ₹{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
             <div style={{
-              fontFamily: 'DM Mono, monospace', fontSize: '12px',
-              padding: '3px 8px', borderRadius: 'var(--r4)',
-              background: displayChangePct >= 0 ? 'var(--up-dim)' : 'var(--dn-dim)',
-              color: displayChangePct >= 0 ? 'var(--up)' : 'var(--dn)',
+              fontFamily: '"JetBrains Mono", monospace', fontSize: '12px',
+              padding: '3px 8px', borderRadius: 'var(--r-pill)',
+              background: displayChangePct >= 0 ? 'var(--success-soft)' : 'var(--error-soft)',
+              color: displayChangePct >= 0 ? 'var(--success)' : 'var(--error)',
               fontWeight: 500,
             }}>
               {displayChangePct >= 0 ? '+' : ''}{displayChangePct.toFixed(2)}%
@@ -176,15 +176,15 @@ export function Dashboard({ authenticated, user }) {
             <div style={{
               display: 'flex', alignItems: 'center', gap: '5px',
               fontSize: '10px', fontWeight: 500,
-              color: wsConnected ? 'var(--up)' : 'var(--text3)',
+              color: wsConnected ? 'var(--success)' : 'var(--muted)',
               letterSpacing: '.06em', textTransform: 'uppercase',
               marginLeft: 'auto',
             }}>
               <span style={{
                 width: '6px', height: '6px', borderRadius: '50%',
-                background: wsConnected ? 'var(--up)' : 'var(--dn)',
+                background: wsConnected ? 'var(--success)' : 'var(--error)',
                 animation: wsConnected ? 'pulse 2s infinite' : 'none',
-                boxShadow: wsConnected ? '0 0 6px var(--up)' : 'none',
+                boxShadow: wsConnected ? '0 0 6px var(--success-glow)' : 'none',
               }} />
               {wsConnected ? 'Live' : 'Offline'}
             </div>
@@ -194,7 +194,7 @@ export function Dashboard({ authenticated, user }) {
         </div>
 
         {/* Order Panel */}
-        <div style={{ background: 'var(--ink)' }}>
+        <div style={{ background: 'var(--paper)' }}>
           <OrderPanel
             defaultSymbol={selectedTicker}
             onSubmit={handleSubmit}
@@ -207,11 +207,11 @@ export function Dashboard({ authenticated, user }) {
       {/* Positions */}
       <div style={{
         margin: '16px 24px 24px',
-        background: 'var(--ink2)',
-        border: '1px solid var(--border2)',
-        borderRadius: 'var(--r2)',
+        background: 'var(--card)',
+        border: '1px solid var(--faint)',
+        borderRadius: 'var(--r-card)',
         overflow: 'hidden',
-        animation: 'fadeInUp 0.5s var(--ease) 0.2s both',
+        animation: 'fadeInUp 0.5s var(--ease-swift) 0.2s both',
       }}>
         <PositionsTable positions={positions} livePrices={livePrices} />
       </div>

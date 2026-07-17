@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ink);
+  background: var(--paper);
   position: relative;
   overflow: hidden;
 }
@@ -19,9 +19,9 @@
   width: 160%;
   height: 160%;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(212,168,67,0.07) 0%, transparent 45%),
-    radial-gradient(ellipse at 80% 80%, rgba(108,158,255,0.05) 0%, transparent 45%),
-    radial-gradient(ellipse at 60% 30%, rgba(34,201,130,0.03) 0%, transparent 40%);
+    radial-gradient(ellipse at 20% 20%, rgba(238,83,8,0.08) 0%, transparent 45%),
+    radial-gradient(ellipse at 80% 80%, rgba(91,77,242,0.05) 0%, transparent 45%),
+    radial-gradient(ellipse at 60% 30%, rgba(30,138,90,0.04) 0%, transparent 40%);
   pointer-events: none;
   animation: meshFloat 12s ease-in-out infinite alternate;
 }
@@ -36,13 +36,13 @@
   width: 100%;
   max-width: 420px;
   padding: 40px 36px;
-  background: rgba(17,18,20,0.75);
+  background: var(--glass);
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 1px solid var(--border2);
-  border-radius: var(--r3);
-  box-shadow: var(--shadow-lg);
-  animation: authFadeIn 0.5s var(--ease);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-lift);
+  animation: authFadeIn 0.5s var(--ease-swift);
 }
 
 @keyframes authFadeIn {
@@ -64,31 +64,24 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-solid) 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
   font-weight: 800;
-  color: #000;
-  box-shadow: var(--shadow-gold);
+  color: #fff;
+  box-shadow: var(--shadow-accent);
 }
 
 .auth-logo-text {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--text);
-}
-
-.auth-logo-text .gold {
-  color: var(--gold);
+  font-size: 28px;
 }
 
 .auth-subtitle {
   text-align: center;
   font-size: 14px;
-  color: var(--text3);
+  color: var(--muted);
   margin-bottom: 32px;
   font-weight: 400;
 }
@@ -98,8 +91,8 @@
   display: flex;
   gap: 4px;
   padding: 3px;
-  background: var(--ink3);
-  border-radius: var(--r4);
+  background: var(--paper-lift);
+  border-radius: var(--r-pill);
   margin-bottom: 24px;
 }
 
@@ -111,23 +104,23 @@
   text-align: center;
   border: none;
   background: transparent;
-  color: var(--text3);
+  color: var(--muted);
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Sofia Sans', sans-serif;
   border-radius: 20px;
-  transition: all 0.25s var(--ease);
+  transition: all 0.25s var(--ease-swift);
 }
 
 .auth-tab.active {
-  background: var(--gold);
-  color: #000;
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(212,168,67,0.25);
+  box-shadow: 0 2px 8px var(--accent-glow);
 }
 
 .auth-tab:not(.active):hover {
-  color: var(--text2);
-  background: rgba(255,255,255,0.04);
+  color: var(--body-color);
+  background: rgba(23,20,15,0.04);
 }
 
 /* Form */
@@ -145,31 +138,31 @@
 
 .auth-field label {
   font-size: 11px;
-  color: var(--text3);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 500;
 }
 
 .auth-field input {
-  background: var(--ink);
-  border: 1px solid var(--border2);
-  border-radius: var(--r);
+  background: var(--paper);
+  border: 1px solid var(--faint);
+  border-radius: var(--r-input);
   padding: 12px 14px;
-  color: var(--text);
+  color: var(--ink);
   font-size: 14px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Sofia Sans', sans-serif;
   outline: none;
-  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  transition: border-color 0.25s var(--ease-swift), box-shadow 0.25s var(--ease-swift);
 }
 
 .auth-field input:focus {
-  border-color: var(--gold-glow);
-  box-shadow: 0 0 0 3px var(--gold-dim), 0 0 16px var(--gold-dim);
+  border-color: var(--accent-glow);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 16px var(--accent-soft);
 }
 
 .auth-field input::placeholder {
-  color: var(--text3);
+  color: var(--muted);
   font-weight: 300;
 }
 
@@ -179,24 +172,24 @@
   padding: 13px;
   margin-top: 8px;
   border: none;
-  border-radius: var(--r);
+  border-radius: var(--r-input);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
-  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-solid) 100%);
-  color: #000;
-  transition: all 0.25s var(--ease);
+  font-family: 'Sofia Sans', sans-serif;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+  color: #fff;
+  transition: all 0.25s var(--ease-swift);
   position: relative;
   overflow: hidden;
-  box-shadow: var(--shadow-gold);
+  box-shadow: var(--shadow-accent);
 }
 
 .auth-submit:hover {
   filter: brightness(1.1);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(212,168,67,0.3);
+  box-shadow: 0 6px 24px var(--accent-glow);
 }
 
 .auth-submit:active {
@@ -219,7 +212,7 @@
   width: 18px; height: 18px;
   margin: -9px 0 0 -9px;
   border: 2px solid transparent;
-  border-top-color: #000;
+  border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -227,11 +220,11 @@
 /* Error message */
 .auth-error {
   padding: 10px 14px;
-  background: var(--dn-dim);
-  border: 1px solid var(--dn-glow);
-  border-radius: var(--r);
+  background: var(--error-soft);
+  border: 1px solid var(--error-glow);
+  border-radius: var(--r-input);
   font-size: 13px;
-  color: var(--dn);
+  color: var(--error);
   text-align: center;
   animation: authShake 0.3s ease;
   display: flex;
@@ -251,7 +244,7 @@
   text-align: center;
   margin-top: 28px;
   padding-top: 20px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--faint);
 }
 
 .auth-features {
@@ -266,16 +259,16 @@
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: var(--text3);
-  background: var(--ink3);
-  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--paper-lift);
+  border: 1px solid var(--faint);
   padding: 4px 10px;
-  border-radius: var(--r4);
+  border-radius: var(--r-pill);
   font-weight: 400;
 }
 
 .auth-feature-chip .mono {
-  color: var(--gold);
-  font-family: 'DM Mono', monospace;
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
   font-weight: 500;
 }

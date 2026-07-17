@@ -13,22 +13,22 @@ export function PriceChart({ data, ticker }) {
       height: 160,
       layout: {
         background: { color: 'transparent' },
-        textColor: '#52525b',
-        fontFamily: 'DM Mono'
+        textColor: '#7C7367',
+        fontFamily: 'JetBrains Mono'
       },
       grid: {
-        vertLines: { color: '#ffffff06' },
-        horzLines: { color: '#ffffff06' }
+        vertLines: { color: '#17140F0A' },
+        horzLines: { color: '#17140F0A' }
       },
       crosshair: { mode: 1 },
-      rightPriceScale: { borderColor: '#ffffff09' },
-      timeScale: { borderColor: '#ffffff09', timeVisible: true }
+      rightPriceScale: { borderColor: '#17140F14' },
+      timeScale: { borderColor: '#17140F14', timeVisible: true }
     });
 
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#34d399', downColor: '#f87171',
-      borderUpColor: '#34d399', borderDownColor: '#f87171',
-      wickUpColor: '#34d39966', wickDownColor: '#f8717166'
+      upColor: '#1E8A5A', downColor: '#D0342C',
+      borderUpColor: '#1E8A5A', borderDownColor: '#D0342C',
+      wickUpColor: '#1E8A5A66', wickDownColor: '#D0342C66'
     });
 
     series.setData(data);

@@ -23,16 +23,16 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
   const totalFees = stt + brokerage + exchangeCharge + sebi + gst;
 
   const inputStyle = {
-    background: 'var(--ink)',
-    border: '1px solid var(--border2)',
-    borderRadius: 'var(--r)',
+    background: 'var(--paper)',
+    border: '1px solid var(--faint)',
+    borderRadius: 'var(--r-input)',
     padding: '10px 12px',
-    color: 'var(--text)',
+    color: 'var(--ink)',
     fontSize: '13px',
-    fontFamily: 'DM Mono, monospace',
+    fontFamily: '"JetBrains Mono", monospace',
     outline: 'none',
     width: '100%',
-    transition: 'border-color 0.2s var(--ease), box-shadow 0.2s var(--ease)',
+    transition: `border-color var(--dur-fast) var(--ease-swift), box-shadow var(--dur-fast) var(--ease-swift)`,
   };
 
   const handleSubmit = () => {
@@ -53,12 +53,12 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
     <div style={{
       padding: '20px 18px',
       display: 'flex', flexDirection: 'column', gap: '16px',
-      animation: 'fadeIn 0.4s var(--ease)',
+      animation: 'fadeIn 0.4s var(--ease-swift)',
     }}>
 
       {/* Header */}
       <div style={{
-        fontSize: '13px', fontWeight: 600, color: 'var(--text)',
+        fontSize: '13px', fontWeight: 600, color: 'var(--ink)',
         letterSpacing: '-0.2px',
         display: 'flex', alignItems: 'center', gap: '8px',
       }}>
@@ -67,11 +67,11 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
           <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
           <path d="M12 18V6"/>
         </svg>
-        Place Order
+        Place order
         <span style={{
           fontSize: '10px', fontWeight: 500,
-          color: 'var(--text3)', background: 'var(--ink3)',
-          padding: '2px 8px', borderRadius: 'var(--r4)',
+          color: 'var(--muted)', background: 'var(--paper-lift)',
+          padding: '2px 8px', borderRadius: 'var(--r-pill)',
           marginLeft: 'auto',
         }}>
           Market
@@ -84,10 +84,10 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
         onChange={e => setSymbol(e.target.value.toUpperCase())}
         style={{
           ...inputStyle,
-          fontSize: '22px', fontWeight: 500, fontFamily: 'Inter, sans-serif',
-          letterSpacing: '-0.5px',
+          fontSize: '22px', fontWeight: 500, fontFamily: '"Sofia Sans", sans-serif',
+          letterSpacing: '-0.02em',
           border: 'none',
-          borderBottom: '2px solid var(--border3)',
+          borderBottom: '2px solid var(--ink-soft)',
           borderRadius: 0,
           padding: '0 0 10px 0',
           background: 'none',
@@ -98,9 +98,9 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
       {/* Buy / Sell toggle */}
       <div style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr',
-        borderRadius: 'var(--r)',
+        borderRadius: 'var(--r-input)',
         overflow: 'hidden',
-        border: '1px solid var(--border2)',
+        border: '1px solid var(--faint)',
       }}>
         {['buy', 'sell'].map(s => (
           <button key={s} onClick={() => setSide(s)}
@@ -110,12 +110,12 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
               cursor: 'pointer', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               background: side === s
-                ? (s === 'buy' ? 'var(--up)' : 'var(--dn)')
-                : 'var(--ink3)',
+                ? (s === 'buy' ? 'var(--success)' : 'var(--error)')
+                : 'var(--paper-lift)',
               color: side === s
-                ? '#000'
-                : 'var(--text3)',
-              transition: 'all 0.2s var(--ease)',
+                ? '#fff'
+                : 'var(--muted)',
+              transition: `all var(--dur-fast) var(--ease-swift)`,
             }}>
             {s === 'buy' ? '↑' : '↓'} {s}
           </button>
@@ -129,10 +129,7 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
           { label: 'Quantity', value: qty, setter: setQty }
         ].map(({ label, value, setter }) => (
           <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <label style={{
-              fontSize: '11px', fontWeight: 500, color: 'var(--text3)',
-              textTransform: 'uppercase', letterSpacing: '.08em',
-            }}>
+            <label className="t-label">
               {label}
             </label>
             <input
@@ -141,11 +138,11 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
               onChange={e => setter(parseFloat(e.target.value) || 0)}
               style={inputStyle}
               onFocus={e => {
-                e.target.style.borderColor = isBuy ? 'var(--up-glow)' : 'var(--dn-glow)';
-                e.target.style.boxShadow = `0 0 0 3px ${isBuy ? 'var(--up-dim)' : 'var(--dn-dim)'}`;
+                e.target.style.borderColor = isBuy ? 'var(--success-glow)' : 'var(--error-glow)';
+                e.target.style.boxShadow = `0 0 0 3px ${isBuy ? 'var(--success-soft)' : 'var(--error-soft)'}`;
               }}
               onBlur={e => {
-                e.target.style.borderColor = 'var(--border2)';
+                e.target.style.borderColor = 'var(--faint)';
                 e.target.style.boxShadow = 'none';
               }}
             />
@@ -157,13 +154,13 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '10px 14px',
-        background: 'var(--ink)', borderRadius: 'var(--r)',
-        border: '1px solid var(--border)',
+        background: 'var(--paper)', borderRadius: 'var(--r-input)',
+        border: '1px solid var(--faint)',
       }}>
-        <span style={{ fontSize: '12px', color: 'var(--text3)' }}>Trade value</span>
+        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Trade value</span>
         <span style={{
-          fontFamily: 'DM Mono, monospace', fontSize: '14px',
-          fontWeight: 500, color: 'var(--text)',
+          fontFamily: '"JetBrains Mono", monospace', fontSize: '14px',
+          fontWeight: 500, color: 'var(--ink)',
         }}>
           ₹{Math.round(tradeValue).toLocaleString('en-IN')}
         </span>
@@ -177,21 +174,21 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
             width: '100%', padding: '8px 12px',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             background: 'none', border: 'none',
-            fontSize: '11px', color: 'var(--text3)',
+            fontSize: '11px', color: 'var(--muted)',
             cursor: 'pointer',
           }}
         >
           <span>Charges & taxes</span>
           <span style={{
             display: 'flex', alignItems: 'center', gap: '4px',
-            fontFamily: 'DM Mono, monospace',
+            fontFamily: '"JetBrains Mono", monospace',
           }}>
             ₹{totalFees.toFixed(2)}
             <svg
               width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
               style={{
                 transform: showFees ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s var(--ease)',
+                transition: `transform var(--dur-fast) var(--ease-swift)`,
               }}
             >
               <polyline points="6 9 12 15 18 9"/>
@@ -201,9 +198,9 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
         {showFees && (
           <div style={{
             padding: '8px 12px',
-            background: 'var(--ink)', borderRadius: 'var(--r)',
-            border: '1px solid var(--border)',
-            animation: 'fadeIn 0.2s var(--ease)',
+            background: 'var(--paper)', borderRadius: 'var(--r-input)',
+            border: '1px solid var(--faint)',
+            animation: 'fadeIn 0.2s var(--ease-swift)',
           }}>
             {[
               { label: 'STT', value: `₹${stt.toFixed(2)}` },
@@ -213,8 +210,8 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
             ].map(({ label, value }) => (
               <div key={label} style={{
                 display: 'flex', justifyContent: 'space-between',
-                fontSize: '11px', fontFamily: 'DM Mono, monospace',
-                color: 'var(--text3)', marginBottom: '3px',
+                fontSize: '11px', fontFamily: '"JetBrains Mono", monospace',
+                color: 'var(--muted)', marginBottom: '3px',
               }}>
                 <span>{label}</span><span>{value}</span>
               </div>
@@ -228,23 +225,23 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
         onClick={handleSubmit}
         disabled={!authenticated}
         style={{
-          width: '100%', padding: '12px', borderRadius: 'var(--r)',
+          width: '100%', padding: '13px', borderRadius: 'var(--r-pill)',
           border: 'none', fontSize: '13px', fontWeight: 600,
           letterSpacing: '.04em', textTransform: 'uppercase',
           cursor: authenticated ? 'pointer' : 'not-allowed',
-          background: !authenticated ? 'var(--ink3)'
+          background: !authenticated ? 'var(--paper-lift)'
             : isBuy
-              ? 'linear-gradient(135deg, var(--up) 0%, #1ab370 100%)'
-              : 'linear-gradient(135deg, var(--dn) 0%, #d63030 100%)',
-          color: !authenticated ? 'var(--text3)' : '#000',
-          transition: 'all 0.2s var(--ease)',
+              ? 'linear-gradient(135deg, var(--success) 0%, #156B45 100%)'
+              : 'linear-gradient(135deg, var(--error) 0%, #A8281F 100%)',
+          color: !authenticated ? 'var(--muted)' : '#fff',
+          transition: `all var(--dur-fast) var(--ease-swift)`,
           opacity: authenticated ? 1 : 0.6,
           boxShadow: authenticated
-            ? (isBuy ? '0 4px 16px var(--up-dim)' : '0 4px 16px var(--dn-dim)')
+            ? (isBuy ? '0 4px 16px var(--success-soft)' : '0 4px 16px var(--error-soft)')
             : 'none',
         }}
         onMouseEnter={e => {
-          if (authenticated) e.target.style.transform = 'translateY(-1px)';
+          if (authenticated) e.target.style.transform = 'translateY(-2px)';
         }}
         onMouseLeave={e => {
           if (authenticated) e.target.style.transform = 'translateY(0)';
@@ -252,7 +249,7 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
       >
         {authenticated
           ? (isBuy ? '↑ Buy' : '↓ Sell') + ' ' + symbol
-          : '🔒 Sign in to trade'}
+          : 'Sign in to trade'}
       </button>
     </div>
   );

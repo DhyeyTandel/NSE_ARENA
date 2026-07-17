@@ -1,25 +1,25 @@
 // components/KpiCard.jsx
 export function KpiCard({ label, value, sub, variant, icon, delay = 0 }) {
   const colors = {
-    default: 'var(--text)',
-    up: 'var(--up)',
-    down: 'var(--dn)',
-    gold: 'var(--gold)',
-    blue: 'var(--blue)',
+    default: 'var(--ink)',
+    up: 'var(--success)',
+    down: 'var(--error)',
+    gold: 'var(--accent)',
+    blue: 'var(--blurple)',
   };
 
   const accentBorders = {
-    up: 'var(--up)',
-    down: 'var(--dn)',
-    gold: 'var(--gold)',
-    blue: 'var(--blue)',
+    up: 'var(--success)',
+    down: 'var(--error)',
+    gold: 'var(--accent)',
+    blue: 'var(--blurple)',
   };
 
   const bgGradients = {
-    up: 'linear-gradient(135deg, rgba(34,201,130,0.04) 0%, transparent 60%)',
-    down: 'linear-gradient(135deg, rgba(239,68,68,0.04) 0%, transparent 60%)',
-    gold: 'linear-gradient(135deg, rgba(212,168,67,0.05) 0%, transparent 60%)',
-    blue: 'linear-gradient(135deg, rgba(108,158,255,0.04) 0%, transparent 60%)',
+    up: 'linear-gradient(135deg, rgba(30,138,90,0.05) 0%, transparent 60%)',
+    down: 'linear-gradient(135deg, rgba(208,52,44,0.05) 0%, transparent 60%)',
+    gold: 'linear-gradient(135deg, rgba(238,83,8,0.06) 0%, transparent 60%)',
+    blue: 'linear-gradient(135deg, rgba(91,77,242,0.05) 0%, transparent 60%)',
   };
 
   const iconMap = {
@@ -53,13 +53,13 @@ export function KpiCard({ label, value, sub, variant, icon, delay = 0 }) {
   return (
     <div style={{
       padding: '20px 22px',
-      borderRight: '1px solid var(--border)',
+      borderRight: '1px solid var(--faint)',
       position: 'relative',
       overflow: 'hidden',
       background: bgGradients[variant] || 'none',
       borderLeft: accentBorders[variant] ? `2px solid ${accentBorders[variant]}` : 'none',
-      animation: `fadeInUp 0.5s var(--ease) ${delay}s both`,
-      transition: 'background 0.3s var(--ease)',
+      animation: `fadeInUp 0.5s var(--ease-swift) ${delay}s both`,
+      transition: `background var(--dur) var(--ease-swift)`,
       cursor: 'default',
     }}>
       {/* Header with icon */}
@@ -69,27 +69,24 @@ export function KpiCard({ label, value, sub, variant, icon, delay = 0 }) {
       }}>
         {icon && iconMap[icon] && (
           <span style={{
-            color: colors[variant] || 'var(--text3)',
+            color: colors[variant] || 'var(--muted)',
             opacity: 0.6,
             display: 'flex',
           }}>
             {iconMap[icon]}
           </span>
         )}
-        <div style={{
-          fontSize: '11px', fontWeight: 500, color: 'var(--text3)',
-          textTransform: 'uppercase', letterSpacing: '.08em',
-        }}>
+        <div className="t-label">
           {label}
         </div>
       </div>
 
       {/* Value */}
       <div style={{
-        fontFamily: 'DM Mono, monospace', fontSize: '26px',
-        fontWeight: 400, letterSpacing: '-.5px', lineHeight: 1,
+        fontFamily: '"JetBrains Mono", monospace', fontSize: '26px',
+        fontWeight: 400, letterSpacing: '-.02em', lineHeight: 1,
         color: colors[variant] || colors.default,
-        transition: 'color 0.3s',
+        transition: `color var(--dur) var(--ease-swift)`,
       }}>
         {value}
       </div>
@@ -97,8 +94,8 @@ export function KpiCard({ label, value, sub, variant, icon, delay = 0 }) {
       {/* Sub text */}
       {sub && (
         <div style={{
-          fontSize: '11.5px', color: 'var(--text3)',
-          marginTop: '6px', fontFamily: 'DM Mono, monospace',
+          fontSize: '11.5px', color: 'var(--muted)',
+          marginTop: '6px', fontFamily: '"JetBrains Mono", monospace',
         }}>
           {sub}
         </div>
