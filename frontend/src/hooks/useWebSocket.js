@@ -9,6 +9,17 @@ export function useWebSocket(url, enabled) {
   const ws = useRef(null);
   const reconnectAttempt = useRef(0);
   const reconnectTimer = useRef(null);
+  const connectRef = useRef(null);
+
+  const scheduleReconnect = useCallback(() => {
+    // Exponential backoff: 3s → 6s → 12s → 24s → 30s (capped)
+    const delay = Math.min(3000 * Math.pow(2, reconnectAttempt.current), MAX_RECONNECT_DELAY);
+    reconnectAttempt.current += 1;
+
+    reconnectTimer.current = setTimeout(() => {
+      connectRef.current?.();
+    }, delay);
+  }, []);
 
   const connect = useCallback(() => {
     // Clean up existing connection
@@ -55,16 +66,10 @@ export function useWebSocket(url, enabled) {
     ws.current.onerror = () => {
       setConnected(false);
     };
-  }, [url, enabled]);
+  }, [url, enabled, scheduleReconnect]);
 
-  const scheduleReconnect = useCallback(() => {
-    // Exponential backoff: 3s → 6s → 12s → 24s → 30s (capped)
-    const delay = Math.min(3000 * Math.pow(2, reconnectAttempt.current), MAX_RECONNECT_DELAY);
-    reconnectAttempt.current += 1;
-
-    reconnectTimer.current = setTimeout(() => {
-      connect();
-    }, delay);
+  useEffect(() => {
+    connectRef.current = connect;
   }, [connect]);
 
   useEffect(() => {

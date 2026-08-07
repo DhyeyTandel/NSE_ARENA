@@ -21,30 +21,22 @@ function App() {
     }
   };
 
-  // Loading state — branded spinner
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh',
-        background: 'var(--paper)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px',
+        minHeight: '100vh', background: 'var(--paper)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: '16px',
       }}>
-        <div style={{
-          width: '40px', height: '40px', borderRadius: 'var(--r-input)',
-          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '20px', fontWeight: 800, color: '#fff',
-          animation: 'glowPulse 1.5s ease-in-out infinite',
-          boxShadow: 'var(--shadow-accent)',
-        }}>
-          N
-        </div>
-        <div className="t-display" style={{ fontSize: '17px' }}>
-          NSE <em>Arena</em>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <span style={{
+            width: '7px', height: '7px', borderRadius: '999px',
+            background: 'var(--accent)', display: 'inline-block',
+          }} />
+          <span style={{
+            fontFamily: '"Newsreader", Georgia, serif',
+            fontSize: '21px', fontWeight: 500, letterSpacing: '-0.02em',
+          }}>NSE Arena</span>
         </div>
         <div style={{
           width: '24px', height: '24px',
@@ -57,18 +49,10 @@ function App() {
     );
   }
 
-  // Not authenticated
   if (!authenticated || !user) {
-    return (
-      <AuthScreen
-        onAuth={handleAuth}
-        error={error}
-        clearError={clearError}
-      />
-    );
+    return <AuthScreen onAuth={handleAuth} error={error} clearError={clearError} />;
   }
 
-  // Authenticated
   const renderScreen = () => {
     switch (activeScreen) {
       case 'dashboard':
@@ -87,23 +71,14 @@ function App() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--paper)',
-      color: 'var(--ink)',
-    }}>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)', color: 'var(--ink)' }}>
       <NavBar
         activeScreen={activeScreen}
         onNavigate={setActiveScreen}
         user={user}
         onLogout={logout}
       />
-      <main style={{
-        maxWidth: '1440px',
-        margin: '0 auto',
-      }}>
-        {renderScreen()}
-      </main>
+      <main>{renderScreen()}</main>
     </div>
   );
 }

@@ -5,7 +5,6 @@ export function PositionsTable({ positions, livePrices = {} }) {
   const [flashTickers, setFlashTickers] = useState({});
   const prevPrices = useRef({});
 
-  // Detect price changes and trigger flash animation
   useEffect(() => {
     const newFlashes = {};
     for (const ticker of Object.keys(livePrices)) {
@@ -15,39 +14,24 @@ export function PositionsTable({ positions, livePrices = {} }) {
         newFlashes[ticker] = curr > prev ? 'up' : 'down';
       }
     }
-
     if (Object.keys(newFlashes).length > 0) {
       setFlashTickers(newFlashes);
       const timer = setTimeout(() => setFlashTickers({}), 600);
       return () => clearTimeout(timer);
     }
-
     const updated = {};
-    for (const [ticker, data] of Object.entries(livePrices)) {
-      updated[ticker] = data.price;
-    }
+    for (const [ticker, data] of Object.entries(livePrices)) updated[ticker] = data.price;
     prevPrices.current = updated;
   }, [livePrices]);
 
   if (!positions || positions.length === 0) {
     return (
       <div style={{
-        padding: '32px 24px',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: '12px',
-        animation: 'fadeIn 0.4s var(--ease-swift)',
+        padding: '32px 24px', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', gap: '10px',
       }}>
-        <div style={{
-          width: '48px', height: '48px', borderRadius: '50%',
-          background: 'var(--paper-lift)', border: '1px solid var(--faint)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '20px', color: 'var(--muted)',
-        }}>
-          ▢
-        </div>
-        <div style={{ fontSize: '13px', color: 'var(--body-color)', fontWeight: 500 }}>
-          No open positions
-        </div>
+        <div style={{ fontSize: '18px', color: 'var(--muted)' }}>▢</div>
+        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--body-color)' }}>No open positions</div>
         <div style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>
           Place your first trade using the order panel above
         </div>
@@ -55,40 +39,35 @@ export function PositionsTable({ positions, livePrices = {} }) {
     );
   }
 
+  const invested = positions.reduce((s, p) => s + p.avg_price * p.quantity, 0);
+
   return (
-    <div style={{ padding: '0 24px 20px' }}>
-      {/* Section header */}
+    <div>
+      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
-        paddingTop: '18px', marginBottom: '12px',
+        display: 'flex', alignItems: 'baseline', gap: '12px',
+        padding: '16px 22px', borderBottom: '1px solid var(--faint)',
       }}>
-        <div className="t-label">
-          Open positions
-        </div>
-        <div style={{
-          fontSize: '10px', fontWeight: 600,
-          color: 'var(--body-color)', background: 'var(--paper-lift)',
-          padding: '2px 8px', borderRadius: 'var(--r-pill)',
-          fontFamily: '"JetBrains Mono", monospace',
-        }}>
-          {positions.length}
+        <div className="t-title" style={{ fontSize: '19px' }}>Open positions</div>
+        <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
+          {positions.length} holdings · ₹{Math.round(invested).toLocaleString('en-IN')} invested
         </div>
       </div>
 
-      {/* Header */}
+      {/* Column headers */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 72px 90px 90px 100px',
-        gap: '8px', padding: '8px 12px',
-        borderBottom: '1px solid var(--faint)',
-        borderRadius: 'var(--r-input) var(--r-input) 0 0',
-        background: 'var(--paper-lift)',
+        display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr 1fr',
+        padding: '10px 22px', borderBottom: '1px solid var(--faint-soft)',
+        fontFamily: '"JetBrains Mono", monospace',
+        fontSize: '10.5px', fontWeight: 600, letterSpacing: '.12em',
+        textTransform: 'uppercase', color: 'var(--muted-soft)',
       }}>
-        {['Symbol', 'Qty', 'Avg Price', 'LTP', 'P&L'].map(h => (
-          <div key={h} className="t-label">
-            {h}
-          </div>
-        ))}
+        <div>Instrument</div>
+        <div style={{ textAlign: 'right' }}>Qty</div>
+        <div style={{ textAlign: 'right' }}>Avg price</div>
+        <div style={{ textAlign: 'right' }}>LTP</div>
+        <div style={{ textAlign: 'right' }}>P&L</div>
+        <div style={{ textAlign: 'right' }}>Change</div>
       </div>
 
       {/* Rows */}
@@ -102,73 +81,43 @@ export function PositionsTable({ positions, livePrices = {} }) {
 
         return (
           <div key={i} style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 72px 90px 90px 100px',
-            gap: '8px',
-            padding: '10px 12px',
-            borderBottom: '1px solid var(--faint)',
-            transition: `background var(--dur) var(--ease-swift)`,
-            background: flash === 'up' ? 'var(--success-soft)'
-              : flash === 'down' ? 'var(--error-soft)' : 'transparent',
-            animation: `fadeInUp 0.3s var(--ease-swift) ${i * 0.05}s both`,
+            display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr 1fr',
+            padding: '13px 22px', borderBottom: '1px solid var(--faint-soft)',
+            fontSize: '14px', alignItems: 'baseline',
+            background: flash === 'up' ? 'var(--success-soft)' : flash === 'down' ? 'var(--error-soft)' : 'transparent',
+            transition: 'background var(--dur) var(--ease-swift)',
             cursor: 'default',
           }}
-            onMouseEnter={e => {
-              if (!flash) e.currentTarget.style.background = 'var(--paper-lift)';
-            }}
-            onMouseLeave={e => {
-              if (!flash) e.currentTarget.style.background = 'transparent';
-            }}
+            onMouseEnter={e => { if (!flash) e.currentTarget.style.background = 'var(--paper-lift)'; }}
+            onMouseLeave={e => { if (!flash) e.currentTarget.style.background = 'transparent'; }}
           >
-            <div style={{
-              fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px',
-            }}>
-              {pos.ticker}
-              {pos.state === 'pending' && (
-                <span style={{
-                  fontSize: '9px', fontWeight: 500, color: 'var(--accent)',
-                  background: 'var(--accent-soft)', border: '1px solid var(--accent-glow)',
-                  padding: '1px 6px', borderRadius: 'var(--r-pill)',
-                }}>
-                  T+1
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+              <span style={{ fontWeight: 600 }}>{pos.ticker}</span>
+              <span style={{
+                fontSize: '11.5px', padding: '1px 8px', borderRadius: '999px',
+                fontWeight: 560,
+                background: pos.state === 'pending' ? 'var(--accent-soft)' : 'var(--faint-soft)',
+                color: pos.state === 'pending' ? 'var(--accent-deep)' : 'var(--muted)',
+              }}>{pos.state === 'pending' ? 'T+1' : pos.state}</span>
             </div>
-            <div style={{
-              fontFamily: '"JetBrains Mono", monospace', fontSize: '13px', color: 'var(--body-color)',
-            }}>
-              {pos.quantity}
-            </div>
-            <div style={{
-              fontFamily: '"JetBrains Mono", monospace', fontSize: '13px', color: 'var(--body-color)',
-            }}>
+            <div style={{ textAlign: 'right', fontFamily: '"JetBrains Mono", monospace' }}>{pos.quantity}</div>
+            <div style={{ textAlign: 'right', fontFamily: '"JetBrains Mono", monospace' }}>
               ₹{pos.avg_price?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <div style={{
-              fontFamily: '"JetBrains Mono", monospace', fontSize: '13px',
-              color: liveData ? 'var(--ink)' : 'var(--body-color)',
-              display: 'flex', alignItems: 'center', gap: '4px',
-              transition: `color var(--dur-fast) var(--ease-swift)`,
-            }}>
+            <div style={{ textAlign: 'right', fontFamily: '"JetBrains Mono", monospace' }}>
               ₹{currentPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              {liveData && (
-                <span style={{
-                  display: 'inline-block', width: '5px', height: '5px',
-                  borderRadius: '50%', background: 'var(--success)',
-                  animation: 'pulse 2s infinite',
-                }} />
-              )}
             </div>
             <div style={{
-              fontFamily: '"JetBrains Mono", monospace', fontSize: '13px',
-              color: isUp ? 'var(--success)' : 'var(--error)',
-              display: 'flex', alignItems: 'center', gap: '4px',
+              textAlign: 'right', fontFamily: '"JetBrains Mono", monospace',
+              fontWeight: 500, color: isUp ? 'var(--success)' : 'var(--error)',
             }}>
-              <span style={{ fontSize: '10px' }}>{isUp ? '▲' : '▼'}</span>
-              {isUp ? '+' : ''}₹{Math.round(pnl).toLocaleString('en-IN')}
-              <span style={{ fontSize: '10px', opacity: 0.7 }}>
-                ({pnlPct.toFixed(1)}%)
-              </span>
+              {isUp ? '+' : '−'}₹{Math.abs(Math.round(pnl)).toLocaleString('en-IN')}
+            </div>
+            <div style={{
+              textAlign: 'right', fontFamily: '"JetBrains Mono", monospace',
+              color: isUp ? 'var(--success)' : 'var(--error)',
+            }}>
+              {isUp ? '+' : ''}{pnlPct.toFixed(2)}%
             </div>
           </div>
         );

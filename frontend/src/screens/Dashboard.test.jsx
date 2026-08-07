@@ -2,9 +2,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-// Mock PriceChart — it needs canvas which jsdom doesn't support
-vi.mock('../components/PriceChart', () => ({
-  PriceChart: ({ ticker }) => <div data-testid="price-chart">{ticker}</div>,
+// Mock TradingViewChart — it needs canvas which jsdom doesn't support
+vi.mock('../components/TradingViewChart', () => ({
+  TradingViewChart: ({ symbol }) => <div data-testid="price-chart">{symbol}</div>,
 }));
 
 // Mock fetch to avoid network calls
@@ -17,7 +17,7 @@ describe('Dashboard', () => {
     render(<Dashboard authenticated={false} />);
 
     expect(screen.getByText('Portfolio value')).toBeTruthy();
-    expect(screen.getByText("Today's P&L")).toBeTruthy();
+    expect(screen.getByText('Season P&L')).toBeTruthy();
     expect(screen.getByText('Trader score')).toBeTruthy();
     expect(screen.getByText('Season rank')).toBeTruthy();
   });
@@ -32,8 +32,8 @@ describe('Dashboard', () => {
   it('renders demo positions in the table', () => {
     render(<Dashboard authenticated={false} />);
 
-    // Demo positions from Dashboard.jsx
-    expect(screen.getByText('TCS')).toBeTruthy();
-    expect(screen.getByText('INFY')).toBeTruthy();
+    // TCS/INFY also appear in the watchlist pills, so there are 2 matches each
+    expect(screen.getAllByText('TCS').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('INFY').length).toBeGreaterThanOrEqual(1);
   });
 });
