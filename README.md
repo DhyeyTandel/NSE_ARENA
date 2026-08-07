@@ -302,6 +302,12 @@ See [`backend/.env.example`](backend/.env.example) for the full list with commen
 
 ---
 
+## 🗺️ Roadmap & History
+
+[`docs/roadmap/`](docs/roadmap/) holds the security/production-readiness review and the prompt-by-prompt fix list that took this from prototype to hardened, plus the forward roadmap (CI, deploy, resting order book, backtester, live bots, and more).
+
+---
+
 ## 📄 License
 
 This project is for educational and personal use.

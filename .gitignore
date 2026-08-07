@@ -40,3 +40,7 @@ htmlcov/
 
 # Logs
 *.log
+
+# Runtime data
+*.db
+dump.rdb
