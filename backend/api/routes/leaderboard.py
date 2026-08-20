@@ -49,15 +49,19 @@ async def get_leaderboard(request: Request, db: AsyncSession = Depends(get_db)):
 
         # Calculate total value (cache-first, threaded fallback — never a
         # blocking yfinance call on the event loop)
+        # avg_price/cash_balance are Decimal (the DB ledger); this route
+        # mixes them with live float market quotes for a read-only ranking
+        # computation, so it drops to float at the read boundary — same
+        # reasoning as api/routes/portfolio.py.
         broadcaster = request.app.state.broadcaster
         holdings_value = 0.0
         for pos in positions:
             if pos.quantity <= 0:
                 continue
-            price = await _price_or_fallback(broadcaster, pos.ticker, pos.avg_price)
+            price = await _price_or_fallback(broadcaster, pos.ticker, float(pos.avg_price))
             holdings_value += price * pos.quantity
 
-        total_value = portfolio.cash_balance + holdings_value
+        total_value = float(portfolio.cash_balance) + holdings_value
         total_return_pct = ((total_value - season.starting_capital) / season.starting_capital * 100)
 
         # Get trader score

@@ -125,4 +125,6 @@ async def test_concurrent_buys_race_on_sqlite(test_db):
         portfolio = (await session.execute(select(Portfolio))).scalar_one()
         assert portfolio.cash_balance >= 0
         # Only the one successful ~99,144.57 buy should have been deducted.
-        assert portfolio.cash_balance == pytest.approx(100000.0 - 99144.57, abs=0.01)
+        # cash_balance is Decimal (Numeric column); cast to float to compare
+        # against pytest.approx's float tolerance arithmetic.
+        assert float(portfolio.cash_balance) == pytest.approx(100000.0 - 99144.57, abs=0.01)

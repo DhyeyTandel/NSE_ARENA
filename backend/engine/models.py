@@ -1,6 +1,7 @@
 # engine/models.py
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 import uuid
 
@@ -31,7 +32,7 @@ class Order:
     side: OrderSide = OrderSide.BUY
     order_type: OrderType = OrderType.MARKET
     quantity: int = 0
-    limit_price: float = 0.0
+    limit_price: Decimal = field(default_factory=lambda: Decimal("0"))
     filled_quantity: int = 0
     avg_fill_price: float = 0.0
     status: OrderStatus = OrderStatus.PENDING
@@ -45,8 +46,8 @@ class Trade:
     buy_order_id: str = ""
     sell_order_id: str = ""
     ticker: str = ""
-    price: float = 0.0
+    price: Decimal = field(default_factory=lambda: Decimal("0"))
     quantity: int = 0
-    fees: float = 0.0
+    fees: Decimal = field(default_factory=lambda: Decimal("0"))
     settlement_date: str = ""  # T+1 date as YYYY-MM-DD
     timestamp: datetime = field(default_factory=datetime.utcnow)

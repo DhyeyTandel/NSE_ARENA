@@ -1,8 +1,18 @@
 # db/models.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, CheckConstraint, Index
+from decimal import Decimal
+
+from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime, ForeignKey, Boolean, Text, CheckConstraint, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
+
+# Money columns use Numeric(14, 2) — exact decimal (paise-precision, up to
+# ₹999,999,999,999.99), not Float. A trading platform accumulating balances
+# over many trades cannot use binary float for stored money: individually
+# tiny rounding errors compound across trades and can eventually trip the
+# cash_balance >= 0 CheckConstraint on a balance that's actually zero.
+# Ratios/percentages/scores (position_size_pct, TraderScore.*) stay Float —
+# they're derived display values, not accumulated ledger amounts.
 
 
 class User(Base):
@@ -55,7 +65,7 @@ class Portfolio(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
-    cash_balance = Column(Float, default=100000.0)
+    cash_balance = Column(Numeric(14, 2), default=Decimal("100000.00"))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="portfolios")
@@ -71,7 +81,7 @@ class Position(Base):
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
     ticker = Column(String(20), nullable=False)
     quantity = Column(Integer, default=0)
-    avg_price = Column(Float, default=0.0)
+    avg_price = Column(Numeric(14, 2), default=Decimal("0"))
     state = Column(String(20), default="confirmed")  # "pending" or "confirmed"
     settlement_date = Column(String(10), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -90,8 +100,8 @@ class TradeRecord(Base):
     side = Column(String(10), nullable=False)  # "buy" or "sell"
     order_type = Column(String(10), nullable=False)  # "market" or "limit"
     quantity = Column(Integer, nullable=False)
-    price = Column(Float, nullable=False)
-    fees = Column(Float, default=0.0)
+    price = Column(Numeric(14, 2), nullable=False)
+    fees = Column(Numeric(14, 2), default=Decimal("0"))
     settlement_date = Column(String(10), nullable=True)
     stop_loss_set = Column(Boolean, default=False)
     guardrail_triggered = Column(Boolean, default=False)
@@ -125,7 +135,7 @@ class DailyPortfolioValue(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
     date = Column(String(10), nullable=False)
-    total_value = Column(Float, nullable=False)
+    total_value = Column(Numeric(14, 2), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

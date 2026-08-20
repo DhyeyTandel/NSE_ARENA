@@ -127,18 +127,24 @@ class AIScheduler:
                 now = datetime.utcnow()
                 days_remaining = max(0, (season.end_date - now).days)
 
+                # cash_balance/avg_price are Decimal (the DB ledger); this
+                # dict is prompt/display/ratio input for the AI, not a
+                # source of truth for stored money, so it drops to float
+                # here rather than carrying Decimal into ratio arithmetic
+                # (agent.py's drawdown calc) mixed with Season.starting_capital,
+                # which stays float (not a money field we migrated).
                 portfolio_data = {
                     "starting_capital": season.starting_capital,
-                    "current_value": portfolio.cash_balance + sum(
-                        p.avg_price * p.quantity for p in positions
+                    "current_value": float(portfolio.cash_balance) + sum(
+                        float(p.avg_price) * p.quantity for p in positions
                     ),
-                    "cash_balance": portfolio.cash_balance,
+                    "cash_balance": float(portfolio.cash_balance),
                     "days_remaining": days_remaining,
                     "positions": [
                         {
                             "ticker": p.ticker,
                             "quantity": p.quantity,
-                            "avg_price": p.avg_price,
+                            "avg_price": float(p.avg_price),
                         }
                         for p in positions
                     ],

@@ -17,6 +17,7 @@ with_for_update(), and commit/rollback.
 """
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,16 +49,23 @@ class TradeRejected(Exception):
         super().__init__(detail)
 
 
+def _to_decimal(value) -> Decimal:
+    """Coerce a float/int/str/Decimal into a Decimal via its string form —
+    never Decimal(float) directly, which would bake in the float's own
+    binary-representation error."""
+    return value if isinstance(value, Decimal) else Decimal(str(value))
+
+
 @dataclass
 class TradeResult:
     ticker: str
     side: str
     order_type: str
     quantity: int
-    price: float
+    price: Decimal
     fees: FeeBreakdown
-    total_cost: float
-    remaining_balance: float
+    total_cost: Decimal
+    remaining_balance: Decimal
 
 
 async def execute_validated_trade(
@@ -84,6 +92,14 @@ async def execute_validated_trade(
     Raises TradeRejected on any validation or fill failure. Caller's
     portfolio row must already be locked with with_for_update().
     """
+    # Callers hand in plain floats (a Pydantic request body, a yfinance
+    # quote dict) — this is the boundary where money enters Decimal space
+    # and stays there for the rest of this function.
+    current_price = _to_decimal(current_price)
+    previous_close = _to_decimal(previous_close)
+    limit_price = _to_decimal(limit_price)
+    stop_loss_price = _to_decimal(stop_loss_price)
+
     if order_type == "limit" and limit_price <= 0:
         raise TradeRejected("Limit price must be greater than zero for limit orders")
 
@@ -93,7 +109,7 @@ async def execute_validated_trade(
         side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
         order_type=OrderType.LIMIT if order_type == "limit" else OrderType.MARKET,
         quantity=quantity,
-        limit_price=limit_price if order_type == "limit" else 0.0,
+        limit_price=limit_price if order_type == "limit" else Decimal("0"),
     )
 
     pos_holdings_result = await db.execute(
@@ -137,10 +153,12 @@ async def execute_validated_trade(
     )
     total_cost = execution_price * quantity + fees.total
 
+    # position_size_pct is a ratio, not a stored money amount — TradeRecord
+    # stores it as a plain Float column, so drop out of Decimal here.
     pre_trade_portfolio_value = portfolio.cash_balance
     position_size_pct = (
-        (execution_price * quantity) / pre_trade_portfolio_value
-        if pre_trade_portfolio_value > 0 else 0
+        float((execution_price * quantity) / pre_trade_portfolio_value)
+        if pre_trade_portfolio_value > 0 else 0.0
     )
 
     if side == "buy":
