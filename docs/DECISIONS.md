@@ -83,3 +83,62 @@ trading frequency grows significantly. `AIRiskMemory` rehydration reads
 the last 50 `AIDecision` rows every cycle with no index hint beyond
 `created_at` ordering — fine at current volume, would want an index if
 `ai_decisions` grows into the tens of thousands of rows.
+
+## [2026-08-20] Drop the unused alembic dependency instead of standing up real migrations
+
+**Problem** — `requirements.txt` listed `alembic==1.13.0`, but there was
+no `alembic/` directory, no `alembic.ini`, and no code anywhere importing
+it (confirmed by grep). Actual schema management is
+`Base.metadata.create_all()` on startup (`database.py`, `main.py`). A
+careful reviewer inspecting dependencies would notice the unused package
+and read it as either an abandoned migration attempt or a stale copy-paste
+from a template — neither is accurate, and this same night's session had
+just changed the schema itself (Priority C: `TraderScore.season_id` → FK,
+new `CheckConstraint`s, new indexes on `Position`/`TradeRecord`), so the
+gap between "declares a migration tool" and "has no migrations" was
+freshly wider, not narrower.
+
+**Options considered**
+1. Configure real Alembic migrations against the async SQLAlchemy setup
+   (`alembic init`, wire `env.py` to the app's `Base` metadata and
+   `DATABASE_URL`, autogenerate a baseline migration matching the schema
+   Priority C just landed) — rejected for tonight specifically, not in
+   general. The autogenerate step needs to run against a real database
+   to diff correctly, and production runs Postgres
+   (`config.py` refuses to boot `ENV=production` against SQLite) while
+   this session has no Postgres instance available — `docker-compose.yml`
+   and all deploy infra are explicitly Pam's file ownership this round,
+   not mine to spin up. Standing up Alembic's async engine wiring
+   correctly (SQLAlchemy 2.0 async + Alembic's still-primarily-sync
+   autogenerate tooling has known rough edges) and shipping it
+   *unvalidated* against the actual target database felt like a worse
+   outcome than not shipping it — a broken migration path masquerading as
+   a working one is strictly worse than an honestly-absent one.
+2. Leave `alembic` in `requirements.txt` untouched and do nothing —
+   rejected. That's the exact state the audit flagged as misleading;
+   doing nothing doesn't resolve the "declares a tool it doesn't use"
+   problem, it just leaves it for the next person to notice.
+3. Drop the dependency and document `Base.metadata.create_all()` as the
+   deliberately-chosen schema strategy for the project's current size —
+   chosen. Honest about what actually runs today; doesn't block a real
+   migration setup later by whoever has Postgres access to validate
+   against.
+
+**Decision** — Removed `alembic==1.13.0` from `backend/requirements.txt`.
+`Base.metadata.create_all()` remains the schema-management strategy.
+
+**Tradeoff accepted** — There is still no migration path. Any future
+schema change (including further money/schema work from this session's
+own punch list) requires either a fresh DB or a hand-written `ALTER
+TABLE`, same as before this decision — this doesn't fix that gap, it just
+stops the dependency list from claiming otherwise. Standing up real
+Alembic migrations against Postgres, with the schema now including this
+session's Numeric/CheckConstraint/index/FK changes, is an explicit,
+concrete follow-up for whoever next has a live Postgres environment to
+validate autogenerate output against.
+
+**What went wrong** — nothing; this was a scope decision made before
+writing any Alembic code, not a rollback from a failed attempt.
+
+**Scale/limits** — N/A — this is the absence of a migration tool, not a
+capability with a scale boundary.
