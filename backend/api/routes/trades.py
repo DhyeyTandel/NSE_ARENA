@@ -1,28 +1,19 @@
 # api/routes/trades.py
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from pydantic import BaseModel, Field
-from datetime import datetime
 from typing import Literal
 import asyncio
 import time
 
 from database import get_db
-from db.models import User, Portfolio, Position, TradeRecord, Season
+from db.models import User, Portfolio, TradeRecord, Season
 from api.dependencies import get_current_user
-from engine.models import Order, OrderSide, OrderType
-from engine.fee_engine import FeeEngine
-from engine.settlement import SettlementEngine
 from market_data.fetcher import MarketDataFetcher
-from engine.validator import (
-    Validator, MarketClosedError, CircuitBreakerError,
-    InsufficientBalanceError, InsufficientSharesError
-)
+from services.trading import execute_validated_trade, TradeRejected
 
 router = APIRouter(prefix="/trades", tags=["trades"])
-fee_engine = FeeEngine()
-settlement_engine = SettlementEngine()
 
 # Execution needs a much tighter staleness bound than the 120s display
 # cache TTL — a price up to 2 minutes old is fine to show, not to trade on.
@@ -61,10 +52,6 @@ async def submit_trade(
     portfolio = portfolio_result.scalar_one_or_none()
     if not portfolio:
         raise HTTPException(status_code=400, detail="No portfolio found for active season")
-
-    # Enforce limit_price for limit orders
-    if request.order_type == "limit" and request.limit_price <= 0:
-        raise HTTPException(status_code=400, detail="Limit price must be greater than zero for limit orders")
 
     async def _refetch_quote() -> dict | None:
         try:
@@ -109,193 +96,42 @@ async def submit_trade(
                 detail="reference price unavailable — cannot verify circuit breaker"
             )
 
-    # Build Order for validation
-    engine_order = Order(
-        user_id=str(user.id),
-        ticker=request.ticker,
-        side=OrderSide.BUY if request.side == "buy" else OrderSide.SELL,
-        order_type=OrderType.LIMIT if request.order_type == "limit" else OrderType.MARKET,
-        quantity=request.quantity,
-        limit_price=request.limit_price if request.order_type == "limit" else 0.0,
-    )
-
-    # Get confirmed holdings for validation
-    pos_holdings_result = await db.execute(
-        select(Position).where(
-            Position.portfolio_id == portfolio.id,
-            Position.state == "confirmed"
-        )
-    )
-    holdings = {pos.ticker: pos.quantity for pos in pos_holdings_result.scalars().all()}
-
-    # Run validation checks
-    validator = Validator()
     try:
-        validator.validate(
-            order=engine_order,
-            balance=portfolio.cash_balance,
-            holdings=holdings,
+        result = await execute_validated_trade(
+            db,
+            user_id=user.id,
+            portfolio=portfolio,
+            ticker=request.ticker,
+            side=request.side,
+            order_type=request.order_type,
+            quantity=request.quantity,
+            current_price=current_price,
             previous_close=previous_close,
-            market_price=current_price,
-            strict=True,
+            limit_price=request.limit_price,
+            stop_loss_price=request.stop_loss_price,
+            source="human",
         )
-    except (MarketClosedError, CircuitBreakerError, InsufficientBalanceError, InsufficientSharesError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except TradeRejected as e:
+        raise HTTPException(status_code=400, detail=e.detail)
 
-    # Determine fill price. We don't support resting orders: a limit order
-    # either fills immediately at the current market price (if the limit
-    # would be satisfied) or is rejected outright — it never fills at the
-    # user-specified limit_price itself, which would let users buy below
-    # (or sell above) market inside the circuit-breaker band.
-    if request.order_type == "limit":
-        if request.side == "buy" and request.limit_price < current_price:
-            raise HTTPException(
-                status_code=400,
-                detail="limit price below market — order would not fill"
-            )
-        if request.side == "sell" and request.limit_price > current_price:
-            raise HTTPException(
-                status_code=400,
-                detail="limit price above market — order would not fill"
-            )
-    execution_price = current_price
-
-    # Calculate fees
-    fees = fee_engine.calculate(
-        price=execution_price,
-        quantity=request.quantity,
-        side=request.side,
-        trade_type="delivery"
-    )
-
-    total_cost = execution_price * request.quantity + fees.total
-
-    # Calculate position size percentage before modifying cash balance
-    pre_trade_portfolio_value = portfolio.cash_balance
-    position_size_pct = (execution_price * request.quantity) / pre_trade_portfolio_value if pre_trade_portfolio_value > 0 else 0
-
-    if request.side == "buy":
-        # Guarded UPDATE backstop: with_for_update() is a silent no-op on
-        # SQLite, so this conditional UPDATE is the only thing that actually
-        # prevents overdraw there. rowcount == 0 means another concurrent
-        # trade already spent the balance this order needed.
-        debit_result = await db.execute(
-            update(Portfolio)
-            .where(Portfolio.id == portfolio.id, Portfolio.cash_balance >= total_cost)
-            .values(cash_balance=Portfolio.cash_balance - total_cost)
-            .execution_options(synchronize_session=False)
-        )
-        if debit_result.rowcount == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient balance. Required: ₹{total_cost:,.2f}, Available: ₹{portfolio.cash_balance:,.2f}"
-            )
-        portfolio.cash_balance -= total_cost
-
-        settlement_date = settlement_engine.calculate_settlement_date(datetime.utcnow())
-
-        # Check for existing position with lock to prevent TOCTOU
-        pos_result = await db.execute(
-            select(Position).where(
-                Position.portfolio_id == portfolio.id,
-                Position.ticker == request.ticker,
-            ).with_for_update()
-        )
-        existing_pos = pos_result.scalar_one_or_none()
-
-        if existing_pos:
-            total_qty = existing_pos.quantity + request.quantity
-            existing_pos.avg_price = (
-                (existing_pos.avg_price * existing_pos.quantity + execution_price * request.quantity) / total_qty
-            )
-            existing_pos.quantity = total_qty
-        else:
-            # Create new pending position (T+1 settlement)
-            new_pos = Position(
-                portfolio_id=portfolio.id,
-                ticker=request.ticker,
-                quantity=request.quantity,
-                avg_price=execution_price,
-                state="pending",
-                settlement_date=settlement_date,
-            )
-            db.add(new_pos)
-
-    elif request.side == "sell":
-        # Lock target position to prevent concurrent sells exceeding holdings
-        pos_result = await db.execute(
-            select(Position).where(
-                Position.portfolio_id == portfolio.id,
-                Position.ticker == request.ticker,
-                Position.state == "confirmed"
-            ).with_for_update()
-        )
-        existing_pos = pos_result.scalar_one_or_none()
-
-        if not existing_pos or existing_pos.quantity < request.quantity:
-            available = existing_pos.quantity if existing_pos else 0
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient shares. Available: {available}, Requested: {request.quantity}"
-            )
-
-        # Guarded UPDATE backstop, same reasoning as the buy-side debit above:
-        # atomic and conditional even where with_for_update() is a no-op.
-        debit_result = await db.execute(
-            update(Position)
-            .where(Position.id == existing_pos.id, Position.quantity >= request.quantity)
-            .values(quantity=Position.quantity - request.quantity)
-            .execution_options(synchronize_session=False)
-        )
-        if debit_result.rowcount == 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient shares. Available: {existing_pos.quantity}, Requested: {request.quantity}"
-            )
-
-        # Add cash (minus fees)
-        sell_value = execution_price * request.quantity - fees.total
-        portfolio.cash_balance += sell_value
-
-        # Update in-memory position to match the guarded UPDATE above
-        existing_pos.quantity -= request.quantity
-        if existing_pos.quantity == 0:
-            await db.delete(existing_pos)
-
-    # Record trade
-    trade_record = TradeRecord(
-        portfolio_id=portfolio.id,
-        order_id=Order().id,
-        ticker=request.ticker,
-        side=request.side,
-        order_type=request.order_type,
-        quantity=request.quantity,
-        price=execution_price,
-        fees=fees.total,
-        settlement_date=settlement_engine.calculate_settlement_date(datetime.utcnow()),
-        stop_loss_set=request.stop_loss_price > 0,
-        position_size_pct=round(position_size_pct, 4),
-        source="human",
-    )
-    db.add(trade_record)
     await db.commit()
 
     return {
         "status": "executed",
-        "ticker": request.ticker,
-        "side": request.side,
-        "quantity": request.quantity,
-        "price": execution_price,
+        "ticker": result.ticker,
+        "side": result.side,
+        "quantity": result.quantity,
+        "price": result.price,
         "fees": {
-            "stt": fees.stt,
-            "brokerage": fees.brokerage,
-            "exchange_charge": fees.exchange_charge,
-            "sebi_charge": fees.sebi_charge,
-            "gst": fees.gst,
-            "total": fees.total,
+            "stt": result.fees.stt,
+            "brokerage": result.fees.brokerage,
+            "exchange_charge": result.fees.exchange_charge,
+            "sebi_charge": result.fees.sebi_charge,
+            "gst": result.fees.gst,
+            "total": result.fees.total,
         },
-        "total_cost": round(total_cost, 2),
-        "remaining_balance": round(portfolio.cash_balance, 2),
+        "total_cost": round(result.total_cost, 2),
+        "remaining_balance": round(result.remaining_balance, 2),
     }
 
 
