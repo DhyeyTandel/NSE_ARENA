@@ -4,6 +4,7 @@
 
 **A real-time paper trading competition platform for Indian (NSE) markets**
 
+[![CI](https://github.com/DhyeyTandel/NSE_ARENA/actions/workflows/ci.yml/badge.svg)](https://github.com/DhyeyTandel/NSE_ARENA/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
@@ -118,20 +119,32 @@ NSE_ARENA/
 │   │   │   └── ...
 │   │   └── hooks/
 │   │       └── useAuth.js
+│   ├── nginx.conf               # Static-file + SPA-fallback config for the Docker image
+│   ├── Dockerfile               # Multi-stage build: vite build -> nginx
 │   └── package.json
-└── docker-compose.yml          # Full-stack Docker setup
+├── Caddyfile                    # Reverse proxy: routes API/WS paths to backend, rest to frontend
+└── docker-compose.yml           # Full-stack Docker setup: caddy, frontend, backend, postgres, redis
 ```
 
 ---
 
 ## 🚀 Getting Started
 
+Two ways to run this: pieces run natively on your machine (steps 1-3,
+useful for active development — hot reload, debugger, etc.), or the whole
+stack in Docker with one command (step 4, closest to how it'd actually be
+deployed).
+
 ### Prerequisites
 
+For running natively (steps 1-3):
 - **Node.js** >= 18
 - **Python** >= 3.11
 - **Redis** (optional — app degrades gracefully without it)
 - **PostgreSQL** (or use the default SQLite for local dev)
+
+For the Docker path (step 4), only **Docker** + **Docker Compose** are
+required — Postgres, Redis, and both app servers run in containers.
 
 ### 1. Clone the Repository
 
@@ -190,12 +203,21 @@ cp .env.deploy.example .env.deploy
 docker-compose --env-file .env.deploy up --build
 ```
 
-This starts Caddy (reverse proxy, ports 80/443), the backend, PostgreSQL,
-and Redis together. Postgres, Redis, and the backend itself do **not**
-publish ports to the host — Caddy is the only entry point, reverse-proxying
-to the backend over the internal compose network and handling HTTPS
-automatically once `DOMAIN` in `.env.deploy` points at a real domain (it
-serves plain HTTP for local testing when `DOMAIN` is unset or `localhost`).
+This starts Caddy (reverse proxy, ports 80/443), the frontend (Vite build
+served by nginx), the backend, PostgreSQL, and Redis together — the whole
+app, not just the API. Open `http://localhost` (or your `DOMAIN`) and
+Caddy routes you to the right place: API/WebSocket/docs paths
+(`/auth`, `/trades`, `/price`, `/ws/prices`, `/health`, `/docs`, etc. — see
+the [`Caddyfile`](Caddyfile)) go to the backend, everything else goes to
+the frontend. The frontend image is built once with no backend URL baked
+in — it talks to the API via same-origin relative paths, so it works
+unmodified behind `localhost` or any real `DOMAIN`.
+
+Postgres, Redis, the backend, and the frontend do **not** publish ports to
+the host — Caddy is the only entry point, reverse-proxying over the
+internal compose network and handling HTTPS automatically once `DOMAIN` in
+`.env.deploy` points at a real domain (it serves plain HTTP for local
+testing when `DOMAIN` is unset or `localhost`).
 
 | `.env.deploy` variable | Required | Description |
 |---|---|---|
@@ -222,7 +244,7 @@ serves plain HTTP for local testing when `DOMAIN` is unset or `localhost`).
 | `GET` | `/scripts/templates` | List built-in script templates |
 | `GET` | `/score/{user_id}` | Get trader score and grade |
 | `GET` | `/health` | Health check (incl. Redis status) |
-| `WS` | `/ws/{user_id}` | Live price stream via WebSocket |
+| `WS` | `/ws/prices` | Live price stream via WebSocket (see [Auth Model](#-auth-model) for handshake auth) |
 
 ---
 

@@ -12,6 +12,20 @@ services:
       - caddy_config:/config
     depends_on:
       - backend
+      - frontend
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      # Empty on purpose — see frontend/Dockerfile and src/config.js.
+      # The built app calls the API/WebSocket via same-origin relative
+      # paths, so one image works behind any DOMAIN without a rebuild.
+      args:
+        VITE_API_URL: ""
+        VITE_WS_URL: ""
+    # No host port published — only reachable through the caddy reverse
+    # proxy above, over the internal compose network.
     restart: unless-stopped
 
   backend:
