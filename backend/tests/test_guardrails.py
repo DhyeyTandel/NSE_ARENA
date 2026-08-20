@@ -53,6 +53,22 @@ class TestPositionSizeRecompute:
         result = guardrail.validate(decision, _portfolio(), market_data)
         assert result.approved
 
+    def test_non_positive_quantity_rejected(self):
+        """A hallucinated negative/zero quantity would otherwise sail past
+        the position-size check (quantity x price <= 0 is never > the
+        20% limit) and reach execute_validated_trade, which would hit
+        TradeRecord's quantity > 0 CheckConstraint as an uncaught
+        IntegrityError instead of a clean guardrail rejection."""
+        market_data = {"RELIANCE": {"price": 1000.0}}
+        for bad_quantity in (-5, 0):
+            decision = {
+                "action": "buy", "ticker": "RELIANCE", "quantity": bad_quantity,
+                "stop_loss_price": 900.0,
+            }
+            result = guardrail.validate(decision, _portfolio(), market_data)
+            assert not result.approved, f"quantity={bad_quantity} should be rejected"
+            assert "quantity" in result.reason.lower()
+
     def test_missing_market_data_rejected_not_trusted(self):
         """No price available for the ticker -> cannot verify position
         size -> reject, rather than falling back to trusting the LLM."""

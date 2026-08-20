@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Portfolio, Position, TradeRecord
 from engine.fee_engine import FeeBreakdown, FeeEngine
 from engine.models import Order, OrderSide, OrderType
+from engine.money import to_decimal
 from engine.settlement import SettlementEngine
 from engine.validator import (
     CircuitBreakerError,
@@ -47,13 +48,6 @@ class TradeRejected(Exception):
     def __init__(self, detail: str):
         self.detail = detail
         super().__init__(detail)
-
-
-def _to_decimal(value) -> Decimal:
-    """Coerce a float/int/str/Decimal into a Decimal via its string form —
-    never Decimal(float) directly, which would bake in the float's own
-    binary-representation error."""
-    return value if isinstance(value, Decimal) else Decimal(str(value))
 
 
 @dataclass
@@ -95,10 +89,10 @@ async def execute_validated_trade(
     # Callers hand in plain floats (a Pydantic request body, a yfinance
     # quote dict) — this is the boundary where money enters Decimal space
     # and stays there for the rest of this function.
-    current_price = _to_decimal(current_price)
-    previous_close = _to_decimal(previous_close)
-    limit_price = _to_decimal(limit_price)
-    stop_loss_price = _to_decimal(stop_loss_price)
+    current_price = to_decimal(current_price)
+    previous_close = to_decimal(previous_close)
+    limit_price = to_decimal(limit_price)
+    stop_loss_price = to_decimal(stop_loss_price)
 
     if order_type == "limit" and limit_price <= 0:
         raise TradeRejected("Limit price must be greater than zero for limit orders")

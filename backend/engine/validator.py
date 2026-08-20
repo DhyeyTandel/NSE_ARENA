@@ -4,20 +4,12 @@ from decimal import Decimal
 import pytz
 from .fee_engine import FeeEngine
 from .models import Order, OrderSide
+from .money import to_decimal
 from . import market_calendar
 
 IST = pytz.timezone("Asia/Kolkata")
 MARKET_OPEN = time(9, 15)
 MARKET_CLOSE = time(15, 30)
-
-
-def _to_decimal(value) -> Decimal:
-    """Coerce a float/int/str/Decimal into a Decimal via its string form.
-    Callers on the live money path (services/trading.py) already pass
-    Decimal; unit tests and any other caller may still pass plain floats —
-    normalizing here means both work and all the arithmetic below is exact
-    either way."""
-    return value if isinstance(value, Decimal) else Decimal(str(value))
 
 
 class InsufficientBalanceError(Exception):
@@ -85,8 +77,8 @@ class Validator:
                     "Reference price (previous close) unavailable — cannot verify circuit breaker"
                 )
             return
-        previous_close = _to_decimal(previous_close)
-        price = _to_decimal(order.limit_price if order.limit_price > 0 else market_price)
+        previous_close = to_decimal(previous_close)
+        price = to_decimal(order.limit_price if order.limit_price > 0 else market_price)
         if price <= 0:
             return
         upper = previous_close * Decimal("1.10")
@@ -103,8 +95,8 @@ class Validator:
         the fees the trade will actually incur — an estimate that ignored
         fees could pass validation and then still fail the DB-layer
         guarded UPDATE on the real, fee-inclusive cost."""
-        balance = _to_decimal(balance)
-        price = _to_decimal(order.limit_price if order.limit_price > 0 else market_price)
+        balance = to_decimal(balance)
+        price = to_decimal(order.limit_price if order.limit_price > 0 else market_price)
         estimated_fees = self._fee_engine.calculate(
             price=price, quantity=order.quantity, side="buy", trade_type="delivery",
         ).total

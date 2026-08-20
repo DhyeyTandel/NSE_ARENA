@@ -54,6 +54,16 @@ class RiskGuardrail:
         # trusted from decision["position_size_pct"].
         ticker = decision.get("ticker")
         quantity = decision.get("quantity", 0) or 0
+        if quantity <= 0:
+            # A non-positive quantity would otherwise sail through the
+            # position-size check below (quantity * price <= 0 is never
+            # > MAX_POSITION_PCT) and reach execute_validated_trade, which
+            # would hit TradeRecord's quantity > 0 CheckConstraint as an
+            # uncaught IntegrityError instead of a clean rejection here.
+            return GuardrailResult(
+                approved=False,
+                reason=f"Invalid quantity {quantity!r} — must be a positive integer.",
+            )
         quote = (market_data or {}).get(ticker) or {}
         price = quote.get("price")
         if not price or price <= 0:

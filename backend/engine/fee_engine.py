@@ -2,12 +2,7 @@
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
-
-def _to_decimal(value) -> Decimal:
-    """Coerce a float/int/str/Decimal into a Decimal via its string form —
-    never construct a Decimal directly from a float, which would bake in
-    the float's own binary-representation error (Decimal(0.1) != 0.1)."""
-    return value if isinstance(value, Decimal) else Decimal(str(value))
+from .money import to_decimal
 
 
 def _round2(value: Decimal) -> Decimal:
@@ -31,7 +26,7 @@ class FeeBreakdown:
 class FeeEngine:
     def calculate(self, price, quantity: int,
                   side: str, trade_type: str = "delivery") -> FeeBreakdown:
-        price = _to_decimal(price)
+        price = to_decimal(price)
         value = price * quantity
 
         if trade_type == "delivery":
