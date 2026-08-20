@@ -10,6 +10,7 @@ import time
 from database import get_db
 from db.models import User, Portfolio, TradeRecord, Season
 from api.dependencies import get_current_user
+from api.rate_limit import check_rate_limit
 from market_data.fetcher import MarketDataFetcher
 from services.trading import execute_validated_trade, TradeRejected
 
@@ -19,9 +20,14 @@ router = APIRouter(prefix="/trades", tags=["trades"])
 # cache TTL — a price up to 2 minutes old is fine to show, not to trade on.
 STALE_PRICE_THRESHOLD_SECONDS = 15
 
+# NSE tickers are uppercase letters/digits, occasionally with '&' or '-'
+# (e.g. "M&M", "BAJAJ-AUTO", "3MINDIA") — reject anything else before it
+# ever reaches yfinance.
+TICKER_PATTERN = r"^[A-Z0-9&\-]{1,20}$"
+
 
 class TradeRequest(BaseModel):
-    ticker: str
+    ticker: str = Field(pattern=TICKER_PATTERN)
     side: Literal["buy", "sell"]
     order_type: Literal["market", "limit"] = "market"
     quantity: int = Field(gt=0)
@@ -36,6 +42,15 @@ async def submit_trade(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # POST /trades is the highest-value endpoint in the app and the only
+    # financial-mutation route with no rate limit — each cache miss also
+    # triggers a real upstream yfinance call, so an unlimited endpoint is
+    # an abuse vector against both the app and that third-party API.
+    await check_rate_limit(
+        http_request, bucket="trades", identity=f"user:{user.id}",
+        limit=20, window_seconds=60
+    )
+
     # Get active season
     season_result = await db.execute(select(Season).where(Season.is_active == True))
     season = season_result.scalar_one_or_none()

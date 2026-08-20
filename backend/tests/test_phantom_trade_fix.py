@@ -153,6 +153,24 @@ async def test_malformed_side_capital_s_rejected_with_422(test_db, client_and_to
 
 
 @pytest.mark.asyncio
+async def test_malformed_ticker_rejected_with_422(client_and_token):
+    """P2 audit fix: ticker had no format validation before reaching
+    yfinance. A stray space/quote/path-like string must 422, not sail
+    through to MarketDataFetcher.get_price()."""
+    client, token, _username = client_and_token
+    headers = {"Authorization": f"Bearer {token}"}
+    p = _open_monday_patch()
+    try:
+        for bad_ticker in ["RELIANCE; DROP", "../../etc/passwd", "", "a" * 21, "reliance"]:
+            resp = await client.post("/trades", headers=headers, json={
+                "ticker": bad_ticker, "side": "buy", "order_type": "market", "quantity": 1,
+            })
+            assert resp.status_code == 422, f"{bad_ticker!r} should have been rejected"
+    finally:
+        p.stop()
+
+
+@pytest.mark.asyncio
 async def test_malformed_order_type_rejected_with_422(client_and_token):
     client, token, _username = client_and_token
     headers = {"Authorization": f"Bearer {token}"}

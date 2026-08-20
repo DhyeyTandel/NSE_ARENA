@@ -139,6 +139,39 @@ async def test_register_rate_limited_after_3_per_hour(client):
 
 
 @pytest.mark.asyncio
+async def test_trades_rate_limited_after_20_per_minute(client, monkeypatch):
+    """P1 audit fix: POST /trades was the one financial-mutation endpoint
+    with no rate limit at all, and each cache miss also triggers a real
+    upstream yfinance call. Mock the price fetch to fail fast and
+    deterministically (a 503, unrelated to the rate limiter) so every
+    request past the limiter behaves the same regardless of real-world
+    weekday/market-hours at test-run time."""
+    monkeypatch.setattr(
+        "market_data.fetcher.MarketDataFetcher.get_price",
+        lambda ticker: (_ for _ in ()).throw(Exception("upstream unavailable")),
+    )
+
+    username = f"user_{uuid.uuid4().hex[:8]}"
+    resp = await client.post("/auth/register", json={
+        "username": username,
+        "email": f"{username}@nse-arena.com",
+        "password": "password123",
+    })
+    token = resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    statuses = []
+    for _ in range(21):
+        resp = await client.post("/trades", headers=headers, json={
+            "ticker": "RELIANCE", "side": "buy", "order_type": "market", "quantity": 1,
+        })
+        statuses.append(resp.status_code)
+
+    assert statuses[:20] == [503] * 20
+    assert statuses[20] == 429
+
+
+@pytest.mark.asyncio
 async def test_scripts_run_rate_limited_after_10_per_minute(client):
     username = f"user_{uuid.uuid4().hex[:8]}"
     resp = await client.post("/auth/register", json={
