@@ -86,7 +86,12 @@ NSE_ARENA/
 │   │       ├── ai.py           # AI agent endpoints
 │   │       └── websocket.py    # Live price WebSocket
 │   ├── market_data/            # yfinance fetcher & Redis broadcaster
-│   ├── engine/                 # Order matching engine
+│   ├── services/
+│   │   └── trading.py          # Validated trade execution (used by both
+│   │                           #   the human /trades route and the AI agent)
+│   ├── engine/                 # Standalone order-matching exercise (SortedDict
+│   │                           #   order book, price-time priority) — NOT wired
+│   │                           #   into the live trade path, see engine/matching.py
 │   ├── scoring/                # Trader scoring algorithm
 │   ├── scripting/              # PineScript-lite parser & indicators
 │   ├── ai/                     # Gemini-based AI trading agents

@@ -1,4 +1,16 @@
 # engine/matching.py
+"""Central matching engine managing per-ticker order books.
+
+STANDALONE — NOT WIRED INTO THE LIVE APP. This module and order_book.py
+are a self-contained price-time-priority matching engine (SortedDict order
+books, per-ticker asyncio.Lock, partial fills) built as an order-matching
+design exercise. Nothing in api/ or main.py imports it: the running app
+fills trades immediately at the current market quote instead of resting
+orders on a book — see services/trading.py (called from
+api/routes/trades.py for human orders and ai/execution.py for AI agent
+orders), which documents why in its own module docstring. If you're
+looking for "the engine powering trades," that's it, not this.
+"""
 from .order_book import OrderBook
 from .models import Order, Trade
 
