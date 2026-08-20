@@ -106,6 +106,8 @@ def stoch(close: np.ndarray, high: np.ndarray, low: np.ndarray,
 def roc(source: np.ndarray, length: int) -> np.ndarray:
     """Rate of Change (percentage)"""
     out = np.full_like(source, np.nan, dtype=float)
+    if length < 1:
+        return out
     for i in range(length, len(source)):
         prev = source[i - length]
         if prev != 0:
@@ -138,7 +140,7 @@ def atr(high: np.ndarray, low: np.ndarray, close: np.ndarray,
                      abs(low[i] - close[i - 1]))
     # Wilder smoothing (same as RMA)
     out = np.full_like(close, np.nan, dtype=float)
-    if length > len(close):
+    if length < 1 or length > len(close):
         return out
     out[length - 1] = np.mean(tr[:length])
     for i in range(length, len(close)):
@@ -179,6 +181,8 @@ def crossunder(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def highest(source: np.ndarray, length: int) -> np.ndarray:
     """Highest value over last `length` bars"""
     out = np.full_like(source, np.nan, dtype=float)
+    if length < 1:
+        return out
     for i in range(length - 1, len(source)):
         out[i] = np.max(source[i - length + 1:i + 1])
     return out
@@ -187,6 +191,8 @@ def highest(source: np.ndarray, length: int) -> np.ndarray:
 def lowest(source: np.ndarray, length: int) -> np.ndarray:
     """Lowest value over last `length` bars"""
     out = np.full_like(source, np.nan, dtype=float)
+    if length < 1:
+        return out
     for i in range(length - 1, len(source)):
         out[i] = np.min(source[i - length + 1:i + 1])
     return out

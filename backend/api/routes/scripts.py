@@ -221,7 +221,10 @@ async def run_user_script(req: RunScriptRequest, http_request: Request,
     except asyncio.TimeoutError:
         raise HTTPException(408, "Script execution timed out (10s limit)")
     except Exception as e:
-        raise HTTPException(500, f"Script execution error: {str(e)}")
+        # Log the real exception server-side; don't hand the client raw
+        # Python exception text (stack internals, file paths, etc).
+        logger.warning("Script execution error for user=%s: %s", user.id, e, exc_info=True)
+        raise HTTPException(500, "Script execution failed — check your script for errors.")
 
     return {
         "indicator_title": result.indicator_title,
