@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Literal
 import asyncio
 import time
 
@@ -30,8 +31,8 @@ STALE_PRICE_THRESHOLD_SECONDS = 15
 
 class TradeRequest(BaseModel):
     ticker: str
-    side: str  # "buy" or "sell"
-    order_type: str = "market"  # "market" or "limit"
+    side: Literal["buy", "sell"]
+    order_type: Literal["market", "limit"] = "market"
     quantity: int = Field(gt=0)
     limit_price: float = Field(default=0.0, ge=0.0)
     stop_loss_price: float = Field(default=0.0, ge=0.0)
