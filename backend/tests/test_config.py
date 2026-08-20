@@ -29,6 +29,22 @@ def test_algorithm_is_hs256():
     assert config.ALGORITHM == "HS256"
 
 
+def test_cors_origins_defaults_to_local_dev_origins():
+    assert config.CORS_ORIGINS == ["http://localhost:5173", "http://localhost:3000"]
+
+
+def test_cors_origins_env_driven(monkeypatch):
+    """P1 audit fix: CORS was hardcoded to localhost in main.py, which
+    hard-failed against any real deployed frontend origin. Now env-driven."""
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com, https://staging.example.com")
+    try:
+        importlib.reload(config)
+        assert config.CORS_ORIGINS == ["https://app.example.com", "https://staging.example.com"]
+    finally:
+        monkeypatch.delenv("CORS_ORIGINS", raising=False)
+        importlib.reload(config)
+
+
 def test_production_sqlite_refuses_to_boot(monkeypatch):
     """Item 2: with_for_update() is a no-op on SQLite, so ENV=production
     must refuse to boot against a sqlite DATABASE_URL."""

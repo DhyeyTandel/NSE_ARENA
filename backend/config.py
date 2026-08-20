@@ -9,6 +9,17 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./nse_arena.db")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+# Comma-separated list of allowed frontend origins for CORS. Defaults to
+# the local Vite/CRA dev origins so nothing breaks out of the box; a real
+# deployment sets CORS_ORIGINS to its actual frontend origin(s) — main.py
+# previously hardcoded just the two localhost origins, which hard-failed
+# CORS against any deployed frontend unless hand-edited.
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 if ENV == "production" and DATABASE_URL.startswith("sqlite"):
     raise RuntimeError(
         "DATABASE_URL is sqlite but ENV=production. Row-locking guarantees "

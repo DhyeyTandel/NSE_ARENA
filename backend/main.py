@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import config
 from database import init_db, async_session
 from api.routes import auth, trades, portfolio, leaderboard, websocket
 from api.routes import seasons as seasons_router
@@ -112,10 +113,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend
+# CORS — allow frontend. Origins are env-driven (config.CORS_ORIGINS) so a
+# deployed frontend origin doesn't require a code change; defaults to the
+# local dev origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
