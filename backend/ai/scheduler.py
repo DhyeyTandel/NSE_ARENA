@@ -77,6 +77,8 @@ class AIScheduler:
         from db.models import User, Portfolio, Position, Season, AIDecision
         from market_data.fetcher import MarketDataFetcher
         from ai.agent import AIAgent
+        from ai.execution import AIOrderExecutionService
+        from ai.risk_memory import AIRiskMemory
 
         logger.info("AI cycle starting...")
 
@@ -155,8 +157,33 @@ class AIScheduler:
                     logger.warning("Could not fetch any market data — skipping cycle")
                     return
 
+                # Rehydrate risk memory from persisted history instead of
+                # starting fresh every cycle — AIAgent is reconstructed here
+                # each run, so without this format_for_prompt() would report
+                # "No previous decisions recorded" on essentially every cycle.
+                risk_memory = AIRiskMemory()
+                past_result = await db.execute(
+                    select(AIDecision).order_by(AIDecision.created_at.desc()).limit(50)
+                )
+                for past in reversed(past_result.scalars().all()):
+                    if past.guardrail_status == "blocked":
+                        risk_memory.record_violation(
+                            {"action": past.action, "ticker": past.ticker},
+                            past.guardrail_reason or "",
+                            timestamp=past.created_at,
+                        )
+                    else:
+                        risk_memory.record_decision({
+                            "action": past.action,
+                            "ticker": past.ticker,
+                            "quantity": past.quantity or 0,
+                            "reasoning": past.reasoning or "",
+                            "confidence": past.confidence or 0.0,
+                        }, timestamp=past.created_at)
+
                 # Run AI agent
-                agent = AIAgent(portfolio_data, order_engine=None)
+                order_engine = AIOrderExecutionService(ai_user.id)
+                agent = AIAgent(portfolio_data, order_engine=order_engine, risk_memory=risk_memory)
                 decision = await agent.run_cycle(market_data)
 
                 # Record the decision

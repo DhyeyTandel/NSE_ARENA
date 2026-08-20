@@ -10,10 +10,12 @@ class AIRiskMemory:
         self.decisions: deque = deque(maxlen=max_entries)
         self.violations: deque = deque(maxlen=20)
 
-    def record_decision(self, decision: dict) -> None:
-        """Log a decision made by the AI"""
+    def record_decision(self, decision: dict, timestamp: datetime | None = None) -> None:
+        """Log a decision made by the AI. `timestamp` defaults to now; the
+        scheduler passes the original AIDecision.created_at when replaying
+        persisted history back into a fresh memory instance."""
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": (timestamp or datetime.utcnow()).isoformat(),
             "action": decision.get("action", "hold"),
             "ticker": decision.get("ticker", ""),
             "quantity": decision.get("quantity", 0),
@@ -22,10 +24,10 @@ class AIRiskMemory:
         }
         self.decisions.append(entry)
 
-    def record_violation(self, decision: dict, reason: str) -> None:
+    def record_violation(self, decision: dict, reason: str, timestamp: datetime | None = None) -> None:
         """Log a guardrail violation"""
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": (timestamp or datetime.utcnow()).isoformat(),
             "attempted_action": decision.get("action", ""),
             "ticker": decision.get("ticker", ""),
             "blocked_reason": reason,

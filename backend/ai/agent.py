@@ -6,6 +6,7 @@ from .risk_memory import AIRiskMemory
 from .guardrails import RiskGuardrail
 from .prompts import SYSTEM_PROMPT, RESPONSE_FORMAT
 from config import GEMINI_API_KEY
+from services.trading import TradeRejected
 
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -13,10 +14,10 @@ GEMINI_CALL_TIMEOUT_SECONDS = 30
 
 
 class AIAgent:
-    def __init__(self, portfolio, order_engine):
+    def __init__(self, portfolio, order_engine, risk_memory: AIRiskMemory | None = None):
         self.portfolio = portfolio
         self.order_engine = order_engine
-        self.memory = AIRiskMemory()
+        self.memory = risk_memory if risk_memory is not None else AIRiskMemory()
         self.guardrail = RiskGuardrail()
         self.model = genai.GenerativeModel("gemini-1.5-pro")
 
@@ -51,7 +52,16 @@ class AIAgent:
             return {"action": "blocked", "reason": result.reason}
 
         if decision["action"] != "hold":
-            await self.order_engine.submit(self._to_order(decision))
+            try:
+                await self.order_engine.submit(self._to_order(decision), market_data)
+            except TradeRejected as e:
+                # Guardrails approved this decision, but execution still
+                # failed (e.g. insufficient balance/shares, market closed,
+                # circuit breaker). Log it the same way a guardrail block
+                # is logged rather than raising — a single bad cycle must
+                # not take down the whole scheduler run.
+                self.memory.record_violation(decision, str(e))
+                return {"action": "blocked", "reason": str(e)}
 
         self.memory.record_decision(decision)
         return decision
