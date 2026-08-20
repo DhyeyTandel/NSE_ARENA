@@ -76,9 +76,15 @@ class Portfolio(Base):
 
 class Position(Base):
     __tablename__ = "positions"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="chk_position_quantity_non_negative"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
+    # Postgres doesn't auto-index FK columns; leaderboard/history queries
+    # filter on portfolio_id constantly, so this would full-scan at scale
+    # without an explicit index.
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     ticker = Column(String(20), nullable=False)
     quantity = Column(Integer, default=0)
     avg_price = Column(Numeric(14, 2), default=Decimal("0"))
@@ -92,9 +98,12 @@ class Position(Base):
 
 class TradeRecord(Base):
     __tablename__ = "trades"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="chk_trade_quantity_positive"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     order_id = Column(String(36), nullable=False)
     ticker = Column(String(20), nullable=False)
     side = Column(String(10), nullable=False)  # "buy" or "sell"
@@ -117,7 +126,7 @@ class TraderScore(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    season_id = Column(Integer, nullable=False)
+    season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
     returns_score = Column(Float, default=0.0)
     risk_score = Column(Float, default=0.0)
     consistency_score = Column(Float, default=0.0)
