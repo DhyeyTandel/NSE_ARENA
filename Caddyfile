@@ -1,3 +1,10 @@
 {$DOMAIN:localhost} {
-	reverse_proxy backend:8000
+	# Backend routes — everything the FastAPI app actually serves. See
+	# backend/main.py and backend/api/routes/*.py for the source of truth.
+	@backend path /auth/* /trades/* /portfolio/* /leaderboard/* /seasons/* /ai/* /api/* /price/* /score/* /ws/* /health /docs /redoc /openapi.json
+
+	reverse_proxy @backend backend:8000
+
+	# Everything else — the React SPA.
+	reverse_proxy frontend:80
 }
