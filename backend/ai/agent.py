@@ -46,7 +46,7 @@ class AIAgent:
             return {"action": "hold", "reason": f"Parse error: {e}"}
 
         # Guardrail check — AI cannot bypass this
-        result = self.guardrail.validate(decision, self.portfolio)
+        result = self.guardrail.validate(decision, self.portfolio, market_data)
         if not result.approved:
             self.memory.record_violation(decision, result.reason)
             return {"action": "blocked", "reason": result.reason}
@@ -113,10 +113,26 @@ Kill switch: trading halted if drawdown exceeds -15%
 
     def _to_order(self, decision: dict):
         from engine.models import Order, OrderSide, OrderType
+
+        action = decision["action"]
+        if action == "buy":
+            side = OrderSide.BUY
+        elif action == "sell":
+            side = OrderSide.SELL
+        else:
+            # The guardrail already rejects any action outside
+            # {buy, sell, hold} before run_cycle ever calls _to_order, and
+            # "hold" never reaches this method either (run_cycle only
+            # calls it when action != "hold") — this is a defense-in-depth
+            # backstop, not a reachable path today. Explicitly refusing to
+            # guess is the point: silently defaulting an unrecognized
+            # action to SELL is exactly the bug this replaces.
+            raise ValueError(f"_to_order called with non-tradeable action: {action!r}")
+
         return Order(
             user_id="ai_agent",
             ticker=decision.get("ticker", ""),
-            side=OrderSide.BUY if decision["action"] == "buy" else OrderSide.SELL,
+            side=side,
             order_type=OrderType.LIMIT if decision.get("order_type") == "limit" else OrderType.MARKET,
             quantity=decision.get("quantity", 0),
             limit_price=decision.get("limit_price", 0.0) or 0.0,

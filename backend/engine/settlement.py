@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 import pytz
 
+from . import market_calendar
+
 IST = pytz.timezone("Asia/Kolkata")
 
 
@@ -30,12 +32,15 @@ class SettlementEngine:
     """
 
     def calculate_settlement_date(self, trade_date: datetime) -> str:
-        """Calculate T+1 settlement date (next trading day at 6 PM IST)"""
+        """Calculate T+1 settlement date (next trading day at 6 PM IST).
+        Skips both weekends and NSE holidays via market_calendar — a trade
+        settling on a holiday would otherwise be marked sellable a day
+        early (e.g. a Monday trade settling "Tuesday" when that Tuesday is
+        an NSE holiday)."""
         ist_date = trade_date.astimezone(IST) if trade_date.tzinfo else IST.localize(trade_date)
         next_day = ist_date + timedelta(days=1)
 
-        # Skip weekends
-        while next_day.weekday() >= 5:  # Saturday=5, Sunday=6
+        while not market_calendar.is_trading_day(next_day.date()):
             next_day += timedelta(days=1)
 
         return next_day.strftime("%Y-%m-%d")

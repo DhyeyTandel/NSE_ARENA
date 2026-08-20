@@ -26,6 +26,15 @@ class TestSettlementDate:
         result = engine.calculate_settlement_date(trade_date)
         assert result == "2026-03-16"
 
+    def test_skips_nse_holiday(self):
+        """P1 audit fix: a Monday trade whose T+1 lands on an NSE holiday
+        must roll forward past it, not just past weekends. 2026-04-14 is
+        Dr. Baba Saheb Ambedkar Jayanti (engine/market_calendar.py)."""
+        # Monday 2026-04-13 -> Tuesday 2026-04-14 is a holiday -> Wednesday 2026-04-15
+        trade_date = IST.localize(datetime(2026, 4, 13, 10, 0))
+        result = engine.calculate_settlement_date(trade_date)
+        assert result == "2026-04-15"
+
 
 class TestCreatePosition:
     def test_creates_pending_position(self):

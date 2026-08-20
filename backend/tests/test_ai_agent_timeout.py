@@ -57,3 +57,16 @@ async def test_run_cycle_succeeds_when_gemini_responds_promptly(monkeypatch):
 
     assert decision["action"] == "hold"
     assert decision["reason"] == "no clear edge"
+
+
+def test_to_order_rejects_unrecognized_action():
+    """P1 audit fix: _to_order used to default any unrecognized action to
+    SELL. It's unreachable via run_cycle now that guardrails.validate()
+    rejects non-buy/sell/hold actions first, but _to_order itself must
+    still refuse to guess rather than silently defaulting to SELL."""
+    agent = AIAgent(_portfolio(), order_engine=None)
+    try:
+        agent._to_order({"action": "short", "ticker": "RELIANCE", "quantity": 1})
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "short" in str(e)

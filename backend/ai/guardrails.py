@@ -11,16 +11,29 @@ class GuardrailResult:
 class RiskGuardrail:
     """Hard limits the AI cannot override"""
 
+    VALID_ACTIONS = ("buy", "sell", "hold")
     MAX_POSITION_PCT = 0.20       # Never risk more than 20% of capital on a single position
     MAX_DRAWDOWN_PCT = -0.15      # Kill switch: trading halted if drawdown exceeds -15%
     REQUIRE_STOP_LOSS = True      # Stop loss is MANDATORY on every trade
 
-    def validate(self, decision: dict, portfolio) -> GuardrailResult:
+    def validate(self, decision: dict, portfolio, market_data: dict | None = None) -> GuardrailResult:
         """
         Validate an AI decision against hard guardrails.
         Returns GuardrailResult with approved=False if any rule is violated.
+
+        `market_data` (the same watchlist quotes passed into run_cycle) is
+        used to recompute position_size_pct from quantity x price /
+        portfolio_value rather than trusting the LLM's self-reported
+        value — a model can misreport (or lie about) its own position
+        size, but it can't fake the arithmetic once we do it ourselves.
         """
         action = decision.get("action", "hold")
+
+        if action not in self.VALID_ACTIONS:
+            return GuardrailResult(
+                approved=False,
+                reason=f"Unrecognized action {action!r} — must be one of {self.VALID_ACTIONS}.",
+            )
 
         if action == "hold":
             return GuardrailResult(approved=True)
@@ -37,8 +50,18 @@ class RiskGuardrail:
                            f"Trading halted until manual review."
                 )
 
-        # Check position size
-        position_size_pct = decision.get("position_size_pct", 0)
+        # Check position size — recomputed from quantity x price, not
+        # trusted from decision["position_size_pct"].
+        ticker = decision.get("ticker")
+        quantity = decision.get("quantity", 0) or 0
+        quote = (market_data or {}).get(ticker) or {}
+        price = quote.get("price")
+        if not price or price <= 0:
+            return GuardrailResult(
+                approved=False,
+                reason=f"No market price available for {ticker!r} — cannot verify position size.",
+            )
+        position_size_pct = (quantity * price) / current_value if current_value > 0 else 0
         if position_size_pct > self.MAX_POSITION_PCT:
             return GuardrailResult(
                 approved=False,
