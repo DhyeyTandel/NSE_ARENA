@@ -1,16 +1,16 @@
 # ai/agent.py
 import asyncio
-import google.generativeai as genai
 import json
+from google import genai
+from google.genai import types as genai_types
 from .risk_memory import AIRiskMemory
 from .guardrails import RiskGuardrail
 from .prompts import SYSTEM_PROMPT, RESPONSE_FORMAT
 from config import GEMINI_API_KEY
 from services.trading import TradeRejected
 
-genai.configure(api_key=GEMINI_API_KEY)
-
 GEMINI_CALL_TIMEOUT_SECONDS = 30
+GEMINI_MODEL_NAME = "gemini-1.5-pro"
 
 
 class AIAgent:
@@ -19,7 +19,13 @@ class AIAgent:
         self.order_engine = order_engine
         self.memory = risk_memory if risk_memory is not None else AIRiskMemory()
         self.guardrail = RiskGuardrail()
-        self.model = genai.GenerativeModel("gemini-1.5-pro")
+        # google.genai.Client validates eagerly and raises on an empty key,
+        # unlike the old google.generativeai SDK's lenient configure() — a
+        # placeholder keeps construction (and tests that monkeypatch
+        # self.client.aio.models afterward) working without a real key in
+        # dev/test; a real call still fails cleanly against Google's API if
+        # GEMINI_API_KEY was genuinely never set in production.
+        self.client = genai.Client(api_key=GEMINI_API_KEY or "unset-gemini-api-key")
 
     async def run_cycle(self, market_data: dict):
         """Called every 30 minutes during market hours"""
@@ -27,12 +33,13 @@ class AIAgent:
 
         try:
             response = await asyncio.wait_for(
-                self.model.generate_content_async(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
+                self.client.aio.models.generate_content(
+                    model=GEMINI_MODEL_NAME,
+                    contents=prompt,
+                    config=genai_types.GenerateContentConfig(
                         temperature=0.3,  # lower = more consistent, less creative
-                        response_mime_type="application/json"
-                    )
+                        response_mime_type="application/json",
+                    ),
                 ),
                 timeout=GEMINI_CALL_TIMEOUT_SECONDS,
             )

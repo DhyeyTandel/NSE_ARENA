@@ -33,7 +33,7 @@ async def test_run_cycle_returns_hold_on_timeout(monkeypatch):
     async def hangs_forever(*args, **kwargs):
         await asyncio.sleep(10)
 
-    monkeypatch.setattr(agent.model, "generate_content_async", hangs_forever)
+    monkeypatch.setattr(agent.client.aio.models, "generate_content", hangs_forever)
 
     decision = await agent.run_cycle({"RELIANCE": {"price": 1000}})
 
@@ -51,7 +51,7 @@ async def test_run_cycle_succeeds_when_gemini_responds_promptly(monkeypatch):
     async def fast_response(*args, **kwargs):
         return FakeResponse()
 
-    monkeypatch.setattr(agent.model, "generate_content_async", fast_response)
+    monkeypatch.setattr(agent.client.aio.models, "generate_content", fast_response)
 
     decision = await agent.run_cycle({"RELIANCE": {"price": 1000}})
 

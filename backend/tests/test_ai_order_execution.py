@@ -104,7 +104,7 @@ async def test_approved_buy_decision_executes_a_real_trade(test_db, monkeypatch)
         lambda ticker: {"ticker": ticker, **MOCK_PRICE},
     )
     monkeypatch.setattr(
-        "google.generativeai.GenerativeModel.generate_content_async",
+        "google.genai.models.AsyncModels.generate_content",
         _mock_gemini_response("buy"),
     )
 
@@ -151,7 +151,7 @@ async def test_hold_decision_writes_no_trade(test_db, monkeypatch):
         lambda ticker: {"ticker": ticker, **MOCK_PRICE},
     )
     monkeypatch.setattr(
-        "google.generativeai.GenerativeModel.generate_content_async",
+        "google.genai.models.AsyncModels.generate_content",
         _mock_gemini_response("hold"),
     )
 
