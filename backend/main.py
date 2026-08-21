@@ -1,12 +1,15 @@
 # main.py
 import logging
 import asyncio
+import uuid
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import config
 from database import init_db, async_session, db_utcnow
+from logging_setup import configure_logging, request_id_var
 from api.routes import auth, trades, portfolio, leaderboard, websocket
 from api.routes import seasons as seasons_router
 from api.routes import ai as ai_router
@@ -14,12 +17,26 @@ from api.routes import scripts as scripts_router
 from market_data.broadcaster import PriceBroadcaster
 from ai.scheduler import ai_scheduler
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
+configure_logging()
 logger = logging.getLogger(__name__)
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Tags every request with a correlation ID (reused from the caller's
+    X-Request-ID header if present, e.g. a reverse proxy that already
+    generated one) so every log line emitted while handling it — from any
+    module — carries the same ID, and echoes it back in the response for
+    client-side correlation."""
+
+    async def dispatch(self, request: Request, call_next):
+        req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        token = request_id_var.set(req_id)
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_var.reset(token)
+        response.headers["X-Request-ID"] = req_id
+        return response
 
 # Global broadcaster instance
 broadcaster = PriceBroadcaster()
@@ -123,6 +140,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
+app.add_middleware(RequestIdMiddleware)
 
 # Mount routes
 app.include_router(auth.router)
