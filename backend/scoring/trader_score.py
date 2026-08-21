@@ -80,29 +80,68 @@ class TraderScoreCalculator:
         return (drawdown_score * 0.6 + vol_score * 0.4)
 
     def _consistency_score(self, daily_returns: pd.Series) -> float:
-        """Percentage of days with positive returns, weighted by streak"""
+        """Win rate blended with streak quality and gain/loss magnitude
+        symmetry: two traders with the same win rate aren't equally
+        "consistent" if one earns it through a sustained run of gains and
+        the other through choppy alternation, or if one's wins are
+        proportionally larger than their losses and the other's aren't.
+        50% win rate, 25% longest-streak-normalized, 25% gain/loss
+        magnitude symmetry."""
         if len(daily_returns) == 0:
             return 50.0
+
         positive_days = (daily_returns > 0).sum()
         win_rate = positive_days / len(daily_returns)
-        return float(win_rate * 100)
+
+        # Longest run of consecutive positive days, normalized by series
+        # length — rewards sustained runs over the same win count scattered
+        # randomly through the period.
+        longest_streak = 0
+        current_streak = 0
+        for value in daily_returns:
+            if value > 0:
+                current_streak += 1
+                longest_streak = max(longest_streak, current_streak)
+            else:
+                current_streak = 0
+        streak_ratio = longest_streak / len(daily_returns)
+
+        # Magnitude symmetry: are gains proportionally bigger than losses,
+        # not just more frequent? 0.5 (neutral) when there's no signal
+        # either way (no gains and no losses yet).
+        gains = daily_returns[daily_returns > 0]
+        losses = daily_returns[daily_returns < 0]
+        avg_gain = gains.mean() if len(gains) > 0 else 0.0
+        avg_loss = abs(losses.mean()) if len(losses) > 0 else 0.0
+        magnitude_ratio = (
+            avg_gain / (avg_gain + avg_loss) if (avg_gain + avg_loss) > 0 else 0.5
+        )
+
+        score = win_rate * 50 + streak_ratio * 25 + magnitude_ratio * 25
+        return float(np.clip(score, 0, 100))
 
     def _discipline_score(self, trades: list) -> float:
-        """Penalise missing stop losses, overtrading, large single bets"""
+        """Penalise missing stop losses, guardrail violations, and
+        oversized single bets — normalized by trade count so an active
+        trader with a LOW violation RATE doesn't score worse than a quiet
+        trader with the same rate just because they made more trades.
+        (The un-normalized version summed penalties across every trade
+        with a fixed floor of 0, so trade volume alone dragged the score
+        down regardless of the underlying discipline rate.)"""
         if not trades:
             return 80.0  # neutral if no trades yet
 
-        penalties = 0
+        total_penalty = 0.0
         for trade in trades:
             if not trade.get("stop_loss_set"):
-                penalties += 10
+                total_penalty += 10
             if trade.get("guardrail_triggered"):
-                penalties += 15
+                total_penalty += 15
             if trade.get("position_size_pct", 0) > 0.25:
-                penalties += 5
+                total_penalty += 5
 
-        base = 100
-        score = max(0, base - penalties)
+        avg_penalty_per_trade = total_penalty / len(trades)
+        score = max(0, 100 - avg_penalty_per_trade)
         return float(score)
 
     def _grade(self, score: int) -> str:
