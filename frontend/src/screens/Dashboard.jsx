@@ -34,9 +34,13 @@ export function Dashboard({ authenticated, user }) {
   const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL, authenticated);
 
   const positions = useMemo(() => {
-    if (portfolio?.holdings?.length > 0) return portfolio.holdings;
-    return DEMO_POSITIONS;
-  }, [portfolio]);
+    // DEMO_POSITIONS is a preview for logged-out visitors only. Once
+    // authenticated, always show the real holdings — even an empty
+    // array — never fake positions a real trader could mistake for
+    // their actual portfolio.
+    if (!authenticated) return DEMO_POSITIONS;
+    return portfolio?.holdings ?? [];
+  }, [portfolio, authenticated]);
 
   const startingCapital = portfolio?.starting_capital || 100000;
 
@@ -241,6 +245,7 @@ export function Dashboard({ authenticated, user }) {
               onSubmit={handleSubmit}
               livePrice={displayPrice}
               authenticated={authenticated}
+              cashBalance={stats.cashBalance}
             />
           </div>
         </div>

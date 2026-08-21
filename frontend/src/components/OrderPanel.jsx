@@ -1,7 +1,7 @@
 // components/OrderPanel.jsx
 import { useState, useEffect } from 'react';
 
-export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, authenticated = false }) {
+export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, authenticated = false, cashBalance = 100000 }) {
   const [side, setSide] = useState('buy');
   const [symbol, setSymbol] = useState(defaultSymbol);
   const [price, setPrice] = useState(livePrice || 2891.45);
@@ -12,7 +12,7 @@ export function OrderPanel({ defaultSymbol = 'RELIANCE', onSubmit, livePrice, au
   useEffect(() => { setSymbol(defaultSymbol); }, [defaultSymbol]);
 
   const est = price * qty;
-  const cashAfter = side === 'buy' ? 41210 - est : 41210 + est;
+  const cashAfter = side === 'buy' ? cashBalance - est : cashBalance + est;
   const isBuy = side === 'buy';
   const inr = n => '₹' + Math.round(Math.abs(n)).toLocaleString('en-IN');
 
