@@ -370,3 +370,72 @@ an unrelated migration, not by a test catching it — worth remembering
 as a case for deliberately tracing "which branch does production
 actually take" as its own explicit check, separate from "are both
 branches unit-tested."
+
+## Reported a bug that wasn't real, then caught and retracted it before it cost anyone time
+
+**What the problem was** — while demoing the app live (backend + frontend
+running together, per a direct request), a single click on OrderPanel's
+"Buy 5 RELIANCE" button appeared to fire 8 separate `POST /trades`
+requests in a row, draining a fresh account's cash until it ran out and
+the backend started correctly rejecting with 400s. I reported this as a
+confirmed frontend bug — a real, serious one, since a user unintentionally
+buying 8x their intended position is a genuine money-integrity concern.
+
+**How it manifested / was noticed** — I noticed it by reading the
+backend's access log after the demo, not by watching it happen in real
+time: a burst of `POST /trades 200 OK` / `GET /portfolio 200 OK` pairs,
+repeated 8 times, immediately following what I remembered as a single
+click action in my own browser-automation batch.
+
+**How it was diagnosed** — Before writing any fix, I read the actual
+source of `OrderPanel.jsx`'s `handleSubmit` and `Dashboard.jsx`'s
+`handleSubmit` end to end: both are plain, single-shot functions — no
+loop, no retry-on-failure logic, nothing that could call itself twice.
+Grepping the whole frontend for every `/trades` POST call site turned up
+exactly one, in the place I'd already read. Nothing in the source
+explained the observed behavior, which was the first sign the original
+observation itself might be wrong rather than the code.
+
+I then set up a controlled repro to settle it: a fresh backend and
+frontend on fresh ports, a fresh account, `window.alert` neutralized via
+injected JavaScript (so a failed trade's error dialog couldn't silently
+block further testing — which is exactly what happened on the first
+retry attempt: the tab became unresponsive to screenshots with "the page
+is busy," which turned out to be nothing more than the app's own
+`alert("Market is closed")` firing, since real IST time by then was
+outside the 9:15am–3:30pm trading window — a correctly-working guard,
+not a bug), and network-request tracking armed *before* each click so
+nothing could be missed. A single deliberate click produced **exactly
+one** `POST /trades`, every time, tested three separate times including
+two clicks in a row producing exactly two requests. No amplification,
+under any condition I could construct.
+
+**How it was fixed** — There was nothing to fix, because there was no
+bug at this location. I retracted the claim explicitly (a written
+correction, not a quiet drop) rather than let an unverified report stand
+or have someone else spend time chasing it. The most likely real
+explanation: during the original faster-paced live demo, I issued more
+click actions across my own batched browser-automation calls than I
+tracked carefully in the moment, and attributed the resulting multiple
+real trades to what I remembered as a single click.
+
+While investigating, I did find two *different*, genuinely real bugs in
+the same component by reading its source directly rather than only
+observing behavior: `OrderPanel.jsx` computed its "Cash after" estimate
+from a hardcoded `41210` instead of the trader's real cash balance, and
+`Dashboard.jsx` fell back to hardcoded demo positions for any
+authenticated account with zero real holdings, indistinguishable from
+"still loading." Both are real bugs, not design choices, so they belong
+here rather than in `docs/DECISIONS.md` — fixed and verified live in
+commit `09e6f6f` on `fix/orderpanel-fake-data`.
+
+**Lesson / takeaway** — A finding observed during a fast, interactive
+demo is not the same thing as a finding verified under controlled
+conditions, even when the log output looks damning. The discipline that
+actually matters here isn't "don't make mistakes" — it's noticing the
+mistake before it propagates: rereading the relevant source with fresh
+eyes before writing a fix, and reproducing under isolated, instrumented
+conditions (armed network tracking, neutralized side effects, one action
+at a time) rather than trusting a fast-moving demo's log output at face
+value. Retracting a wrong claim in writing, as soon as it's known to be
+wrong, costs less than letting it stand costs everyone else.
