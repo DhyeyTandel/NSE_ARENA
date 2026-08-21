@@ -1,6 +1,6 @@
 # engine/models.py
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 import uuid
@@ -36,7 +36,7 @@ class Order:
     filled_quantity: int = 0
     avg_fill_price: float = 0.0
     status: OrderStatus = OrderStatus.PENDING
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source: str = "human"  # "human" or "ai_agent"
 
 
@@ -50,4 +50,4 @@ class Trade:
     quantity: int = 0
     fees: Decimal = field(default_factory=lambda: Decimal("0"))
     settlement_date: str = ""  # T+1 date as YYYY-MM-DD
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

@@ -2,11 +2,11 @@
 import logging
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import config
-from database import init_db, async_session
+from database import init_db, async_session, db_utcnow
 from api.routes import auth, trades, portfolio, leaderboard, websocket
 from api.routes import seasons as seasons_router
 from api.routes import ai as ai_router
@@ -45,8 +45,8 @@ async def ensure_active_season():
         if not season:
             season = Season(
                 name="Season 1",
-                start_date=datetime.utcnow(),
-                end_date=datetime.utcnow() + timedelta(days=30),
+                start_date=db_utcnow(),
+                end_date=db_utcnow() + timedelta(days=30),
                 starting_capital=100000.0,
             )
             db.add(season)

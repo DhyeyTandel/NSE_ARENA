@@ -1,6 +1,6 @@
 # engine/settlement.py
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import pytz
 
@@ -20,7 +20,7 @@ class Position:
     quantity: int = 0
     avg_price: float = 0.0
     state: PositionState = PositionState.PENDING
-    trade_date: datetime = field(default_factory=datetime.utcnow)
+    trade_date: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     settlement_date: str = ""  # YYYY-MM-DD when it becomes confirmed
 
 

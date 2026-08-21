@@ -3,8 +3,7 @@ from decimal import Decimal
 
 from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime, ForeignKey, Boolean, Text, CheckConstraint, Index
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from database import Base
+from database import Base, db_utcnow
 
 # Money columns use Numeric(14, 2) — exact decimal (paise-precision, up to
 # ₹999,999,999,999.99), not Float. A trading platform accumulating balances
@@ -22,7 +21,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
     is_ai = Column(Boolean, default=False)
 
     portfolios = relationship("Portfolio", back_populates="user")
@@ -66,7 +65,7 @@ class Portfolio(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     season_id = Column(Integer, ForeignKey("seasons.id"), nullable=False)
     cash_balance = Column(Numeric(14, 2), default=Decimal("100000.00"))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
 
     user = relationship("User", back_populates="portfolios")
     season = relationship("Season", back_populates="portfolios")
@@ -90,8 +89,8 @@ class Position(Base):
     avg_price = Column(Numeric(14, 2), default=Decimal("0"))
     state = Column(String(20), default="confirmed")  # "pending" or "confirmed"
     settlement_date = Column(String(10), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
+    updated_at = Column(DateTime, default=db_utcnow, onupdate=db_utcnow)
 
     portfolio = relationship("Portfolio", back_populates="positions")
 
@@ -116,7 +115,7 @@ class TradeRecord(Base):
     guardrail_triggered = Column(Boolean, default=False)
     position_size_pct = Column(Float, default=0.0)
     source = Column(String(20), default="human")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
 
     portfolio = relationship("Portfolio", back_populates="trades")
 
@@ -133,7 +132,7 @@ class TraderScore(Base):
     discipline_score = Column(Float, default=0.0)
     final_score = Column(Integer, default=300)
     grade = Column(String(20), default="Beginner")
-    calculated_at = Column(DateTime, default=datetime.utcnow)
+    calculated_at = Column(DateTime, default=db_utcnow)
 
     user = relationship("User", back_populates="trader_scores")
 
@@ -145,7 +144,7 @@ class DailyPortfolioValue(Base):
     portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
     date = Column(String(10), nullable=False)
     total_value = Column(Numeric(14, 2), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
 
 
 class AIDecision(Base):
@@ -161,7 +160,7 @@ class AIDecision(Base):
     position_size_pct = Column(Float, nullable=True)
     guardrail_status = Column(String(20), default="approved")  # "approved" or "blocked"
     guardrail_reason = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
 
 
 class UserScript(Base):
@@ -171,5 +170,5 @@ class UserScript(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(100), nullable=False)
     code = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=db_utcnow)
+    updated_at = Column(DateTime, default=db_utcnow, onupdate=db_utcnow)

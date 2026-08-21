@@ -16,7 +16,7 @@ current_price/previous_close, locking the portfolio row with
 with_for_update(), and commit/rollback.
 """
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select, update
@@ -172,7 +172,7 @@ async def execute_validated_trade(
             )
         portfolio.cash_balance -= total_cost
 
-        settlement_date = settlement_engine.calculate_settlement_date(datetime.utcnow())
+        settlement_date = settlement_engine.calculate_settlement_date(datetime.now(timezone.utc))
 
         # Check for existing position with lock to prevent TOCTOU
         pos_result = await db.execute(
@@ -244,7 +244,7 @@ async def execute_validated_trade(
         quantity=quantity,
         price=execution_price,
         fees=fees.total,
-        settlement_date=settlement_engine.calculate_settlement_date(datetime.utcnow()),
+        settlement_date=settlement_engine.calculate_settlement_date(datetime.now(timezone.utc)),
         stop_loss_set=stop_loss_price > 0,
         position_size_pct=round(position_size_pct, 4),
         source=source,

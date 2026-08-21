@@ -1,5 +1,5 @@
 # ai/risk_memory.py
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import deque
 
 
@@ -15,7 +15,7 @@ class AIRiskMemory:
         scheduler passes the original AIDecision.created_at when replaying
         persisted history back into a fresh memory instance."""
         entry = {
-            "timestamp": (timestamp or datetime.utcnow()).isoformat(),
+            "timestamp": (timestamp or datetime.now(timezone.utc)).isoformat(),
             "action": decision.get("action", "hold"),
             "ticker": decision.get("ticker", ""),
             "quantity": decision.get("quantity", 0),
@@ -27,7 +27,7 @@ class AIRiskMemory:
     def record_violation(self, decision: dict, reason: str, timestamp: datetime | None = None) -> None:
         """Log a guardrail violation"""
         entry = {
-            "timestamp": (timestamp or datetime.utcnow()).isoformat(),
+            "timestamp": (timestamp or datetime.now(timezone.utc)).isoformat(),
             "attempted_action": decision.get("action", ""),
             "ticker": decision.get("ticker", ""),
             "blocked_reason": reason,

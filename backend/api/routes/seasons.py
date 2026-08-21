@@ -2,9 +2,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
 
-from database import get_db
+from database import get_db, db_utcnow
 from db.models import Season
 
 router = APIRouter(prefix="/seasons", tags=["seasons"])
@@ -19,7 +18,7 @@ async def get_active_season(db: AsyncSession = Depends(get_db)):
     if not season:
         return None
 
-    now = datetime.utcnow()
+    now = db_utcnow()
     days_remaining = max(0, (season.end_date - now).days)
     total_days = max(1, (season.end_date - season.start_date).days)
     days_elapsed = total_days - days_remaining

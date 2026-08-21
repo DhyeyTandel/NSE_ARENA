@@ -15,7 +15,7 @@ other's commits and the test would not exercise real concurrency.
 """
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -51,8 +51,8 @@ async def test_db(tmp_path):
     async with async_session() as db:
         season = Season(
             name="Season 1",
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow() + timedelta(days=30),
+            start_date=datetime.now(timezone.utc) - timedelta(days=1),
+            end_date=datetime.now(timezone.utc) + timedelta(days=30),
             starting_capital=100000.0,
             is_active=True,
         )

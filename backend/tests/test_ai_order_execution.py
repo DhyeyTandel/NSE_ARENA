@@ -12,7 +12,7 @@ production uses -- with only Gemini and the yfinance-backed price fetcher
 mocked, and asserts a guardrail-approved decision actually lands: cash and
 position move, and an AIDecision row is written.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -41,8 +41,8 @@ async def test_db():
     async with session_maker() as db:
         season = Season(
             name="Season 1",
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow() + timedelta(days=30),
+            start_date=datetime.now(timezone.utc) - timedelta(days=1),
+            end_date=datetime.now(timezone.utc) + timedelta(days=30),
             starting_capital=100000.0,
             is_active=True,
         )

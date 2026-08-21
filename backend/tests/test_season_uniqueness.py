@@ -6,7 +6,7 @@ both create one. A partial unique index (WHERE is_active) now makes the
 second INSERT fail with an IntegrityError; ensure_active_season() treats
 that as "another worker already created it" rather than crashing.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -36,8 +36,8 @@ async def db_session(tmp_path):
 def _season(name="Season 1", active=True):
     return Season(
         name=name,
-        start_date=datetime.utcnow(),
-        end_date=datetime.utcnow() + timedelta(days=30),
+        start_date=datetime.now(timezone.utc),
+        end_date=datetime.now(timezone.utc) + timedelta(days=30),
         starting_capital=100000.0,
         is_active=active,
     )

@@ -1,6 +1,6 @@
 # ai/position_monitor.py
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class PositionMonitor:
@@ -23,7 +23,7 @@ class PositionMonitor:
             "user_id": user_id,
             "price": stop_price,
             "quantity": quantity,
-            "set_at": datetime.utcnow().isoformat(),
+            "set_at": datetime.now(timezone.utc).isoformat(),
         }
 
     def remove_stop_loss(self, ticker: str, user_id: str) -> None:
@@ -50,7 +50,7 @@ class PositionMonitor:
                         "stop_price": stop["price"],
                         "trigger_price": current_price,
                         "quantity": stop["quantity"],
-                        "triggered_at": datetime.utcnow().isoformat(),
+                        "triggered_at": datetime.now(timezone.utc).isoformat(),
                     })
                     keys_to_remove.append(key)
 

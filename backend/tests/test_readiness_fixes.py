@@ -4,7 +4,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from database import Base, get_db
 from db.models import User, Season, Portfolio, Position
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import time
 import asyncio
@@ -35,8 +35,8 @@ async def test_db():
     async with async_session() as db:
         season = Season(
             name="Season 1",
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow() + timedelta(days=30),
+            start_date=datetime.now(timezone.utc) - timedelta(days=1),
+            end_date=datetime.now(timezone.utc) + timedelta(days=30),
             starting_capital=100000.0,
             is_active=True
         )

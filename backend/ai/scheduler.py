@@ -5,7 +5,6 @@ during Indian market hours (9:15 AM – 3:30 PM IST, Mon–Fri).
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -73,7 +72,7 @@ class AIScheduler:
     async def _run_ai_cycle(self):
         """Execute one AI trading cycle"""
         from sqlalchemy import select
-        from database import async_session
+        from database import async_session, db_utcnow
         from db.models import User, Portfolio, Position, Season, AIDecision
         from market_data.fetcher import MarketDataFetcher
         from ai.agent import AIAgent
@@ -124,7 +123,7 @@ class AIScheduler:
                 positions = result.scalars().all()
 
                 # Build portfolio dict for the AI agent
-                now = datetime.utcnow()
+                now = db_utcnow()
                 days_remaining = max(0, (season.end_date - now).days)
 
                 # cash_balance/avg_price are Decimal (the DB ledger); this
