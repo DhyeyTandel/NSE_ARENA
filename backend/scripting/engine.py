@@ -10,7 +10,10 @@ Supports a safe subset of PineScript v5 syntax:
   - ta.* indicator functions
   - math.* helpers
   - var declarations, arithmetic, comparisons
-  - if/else, ternary ? :
+  - ternary ? : for conditionals (if/else blocks are NOT supported —
+    this is a line-by-line interpreter with no indentation/block
+    tracking; an if/else line raises a clear error pointing at ternary
+    instead of silently doing nothing)
   - Series lookback: close[1]
 
 Security: NO eval(), NO imports, NO file/network access.
@@ -89,64 +92,6 @@ PLOT_STYLES = {
     "plot.style_columns": "histogram",
     "plot.style_cross": "circles",
 }
-
-
-# ── Tokenizer ───────────────────────────────────────────────────────────────
-
-TOKEN_SPEC = [
-    ("COMMENT",   r"//[^\n]*"),
-    ("FLOAT",     r"\d+\.\d+"),
-    ("INT",       r"\d+"),
-    ("STRING",    r'"[^"]*"|\'[^\']*\''),
-    ("IDENT",     r"[A-Za-z_][A-Za-z0-9_.]*"),
-    ("LBRACKET",  r"\["),
-    ("RBRACKET",  r"\]"),
-    ("LPAREN",    r"\("),
-    ("RPAREN",    r"\)"),
-    ("COMMA",     r","),
-    ("ASSIGN",    r"="),
-    ("PLUS",      r"\+"),
-    ("MINUS",     r"-"),
-    ("MUL",       r"\*"),
-    ("DIV",       r"/"),
-    ("GT",        r">"),
-    ("LT",        r"<"),
-    ("GE",        r">="),
-    ("LE",        r"<="),
-    ("EQ",        r"=="),
-    ("NE",        r"!="),
-    ("QUESTION",  r"\?"),
-    ("COLON",     r":"),
-    ("AND",       r"and"),
-    ("OR",        r"or"),
-    ("NOT",       r"not"),
-    ("NEWLINE",   r"\n"),
-    ("SKIP",      r"[ \t]+"),
-]
-
-TOKEN_RE = re.compile(
-    "|".join(f"(?P<{name}>{pattern})" for name, pattern in TOKEN_SPEC)
-)
-
-
-@dataclass
-class Token:
-    type: str
-    value: str
-    line: int
-
-
-def tokenize(code: str) -> list[Token]:
-    tokens = []
-    for lineno, line_text in enumerate(code.split("\n"), 1):
-        for m in TOKEN_RE.finditer(line_text):
-            kind = m.lastgroup
-            val = m.group()
-            if kind == "COMMENT" or kind == "SKIP":
-                continue
-            tokens.append(Token(kind, val, lineno))
-        tokens.append(Token("NEWLINE", "\\n", lineno))
-    return tokens
 
 
 # ── Execution Engine ────────────────────────────────────────────────────────
@@ -423,8 +368,21 @@ class PineEngine:
                 ))
             return
 
+        # if/else/elif blocks: not supported by this line-by-line
+        # interpreter (no indentation/block tracking to know which
+        # following lines belong to the branch). Raise a clear, actionable
+        # error instead of silently doing nothing — the previous behavior
+        # let an if/else block fall through every branch below unmatched,
+        # so the line just had no effect with no indication anything was
+        # wrong.
+        if re.match(r"^(if|elif|else)\b", line):
+            raise ValueError(
+                "if/else blocks are not supported — use the ternary "
+                "operator instead: condition ? true_val : false_val"
+            )
+
         # Variable assignment: varName = expression
-        if "=" in line and not line.startswith("if") and "==" not in line.replace("==", ""):
+        if "=" in line:
             # Handle multi-assignment for tuple returns: [a, b, c] = ta.macd(...)
             if line.startswith("["):
                 bracket_end = line.index("]")
