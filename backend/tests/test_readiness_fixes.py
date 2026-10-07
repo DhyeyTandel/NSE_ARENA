@@ -121,7 +121,7 @@ async def test_limit_far_below_market_rejected(client_and_token):
     }
 
     with patch("engine.validator.datetime") as mock_dt, \
-         patch("market_data.broadcaster.PriceBroadcaster.get_cached_price", new_callable=AsyncMock, return_value=mock_price_data):
+         patch.object(app.state.broadcaster, "get_cached_price", new_callable=AsyncMock, return_value=mock_price_data):
         mock_dt.now.return_value = open_monday
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
         
@@ -154,7 +154,7 @@ async def test_trade_rejected_outside_market_hours(client_and_token):
     }
 
     with patch("engine.validator.datetime") as mock_dt, \
-         patch("market_data.broadcaster.PriceBroadcaster.get_cached_price", new_callable=AsyncMock, return_value=mock_price_data):
+         patch.object(app.state.broadcaster, "get_cached_price", new_callable=AsyncMock, return_value=mock_price_data):
         mock_dt.now.return_value = weekend_time
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
         
