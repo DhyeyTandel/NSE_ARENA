@@ -10,6 +10,7 @@ yfinance==0.2.40
 sortedcontainers==2.4.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
 pydantic==2.12.5
 python-dotenv==1.2.2
 pytz==2024.1
