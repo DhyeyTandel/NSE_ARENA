@@ -107,13 +107,31 @@ def test_private_peer_honours_xff():
     assert resolve_client_ip("127.0.0.1", "203.0.113.9") == "203.0.113.9"
 
 
-def test_xff_read_right_to_left_skipping_internal_hops():
-    assert resolve_client_ip(
-        "172.18.0.2", "6.6.6.6, 100.64.0.5, 172.18.0.1") == "100.64.0.5"
+def test_only_rightmost_xff_entry_is_used():
+    # Caddy writes a single client_ip value; anything left of it is forged.
+    assert resolve_client_ip("172.18.0.2", "6.6.6.6, 100.64.0.5") == "100.64.0.5"
+    assert resolve_client_ip("172.18.0.2", "6.6.6.6, 203.0.113.9") == "203.0.113.9"
 
 
-def test_all_internal_chain_uses_leftmost():
-    assert resolve_client_ip("172.18.0.2", "fd7a:115c:a1e0::1, 172.18.0.1") == "fd7a:115c:a1e0::1"
+def test_tailscale_ipv6_client_is_returned():
+    assert resolve_client_ip("172.18.0.2", "fd7a:115c:a1e0::1") == "fd7a:115c:a1e0::1"
+
+
+@pytest.mark.parametrize("peer", ["100.64.0.5", "100.127.255.254", "fd7a:115c:a1e0::5",
+                                  "fd7a:115c:a1e0:ab12::7"])
+def test_tailscale_peer_cannot_forge_xff(peer):
+    # A tailnet client reaching the backend directly is the client itself.
+    assert resolve_client_ip(peer, "198.51.100.77") == peer
+    assert resolve_client_ip(peer, "10.0.0.1") == peer
+
+
+def test_forged_xff_left_of_tailscale_client_ignored():
+    assert resolve_client_ip("172.18.0.2", "198.51.100.77, 100.101.102.103") == "100.101.102.103"
+    assert resolve_client_ip("172.18.0.2", "198.51.100.77, fd7a:115c:a1e0::9") == "fd7a:115c:a1e0::9"
+
+
+def test_non_tailscale_ula_is_still_internal():
+    assert resolve_client_ip("fd00::2", "203.0.113.9") == "203.0.113.9"
 
 
 @pytest.mark.parametrize("bad", ["not-an-ip", "1.2.3.4, evil", "1.2.3.4:80", "<script>", ","])
@@ -325,7 +343,7 @@ async def test_login_does_not_apply_registration_rules(env):
         await db.commit()
     resp = await env.client.post("/auth/login/json", json={"username": "a.legacy name", "password": "abc"})
     assert resp.status_code == 200
-    resp = await env.client.post("/auth/login", data={"username": "ai-agent", "password": "x" * 20})
+    resp = await env.client.post("/auth/login/json", json={"username": "ai-agent", "password": "x" * 20})
     assert resp.status_code == 200
 
 
@@ -333,12 +351,9 @@ async def test_login_does_not_apply_registration_rules(env):
 async def test_login_unknown_user_still_runs_one_bcrypt_verify(env):
     assert auth_module.pwd_context.identify(auth_module._DUMMY_HASH) == "bcrypt"
     with patch.object(auth_module.pwd_context, "verify", return_value=False) as verify:
-        for path, kw in (("/auth/login/json", {"json": {"username": "ghost", "password": "pw"}}),
-                         ("/auth/login", {"data": {"username": "ghost", "password": "pw"}})):
-            verify.reset_mock()
-            resp = await env.client.post(path, **kw)
-            assert resp.status_code == 401
-            verify.assert_called_once_with("pw", auth_module._DUMMY_HASH)
+        resp = await env.client.post("/auth/login/json", json={"username": "ghost", "password": "pw"})
+        assert resp.status_code == 401
+        verify.assert_called_once_with("pw", auth_module._DUMMY_HASH)
 
 
 # ── 6. JWT revocation ───────────────────────────────────────────────
@@ -404,3 +419,16 @@ async def test_revocation_fails_open_and_warns_once(env, caplog):
         assert (await env.client.post("/auth/logout", headers=auth)).status_code == 200
     warnings = [r for r in caplog.records if r.name == "api.token_revocation"]
     assert len(warnings) == 1
+
+
+@pytest.mark.asyncio
+async def test_register_integrity_error_maps_to_same_400(env):
+    """A concurrent duplicate that slips past the pre-check and trips the
+    unique index returns the same 400 as the pre-check."""
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.ext.asyncio import AsyncSession
+    err = IntegrityError("INSERT", {}, Exception("UNIQUE constraint failed: index 'ix_users_username_lower'"))
+    with patch.object(AsyncSession, "flush", side_effect=err):
+        resp = await env.client.post("/auth/register", json={
+            "username": "racer", "email": "racer@example.com", "password": "password123"})
+    assert resp.status_code == 400 and resp.json()["detail"] == "Username already registered"

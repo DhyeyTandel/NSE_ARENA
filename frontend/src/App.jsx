@@ -1,5 +1,5 @@
 // App.jsx
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { NavBar } from './components/NavBar';
 import { AuthScreen } from './screens/AuthScreen';
@@ -7,8 +7,11 @@ import { Dashboard } from './screens/Dashboard';
 import { Leaderboard } from './screens/Leaderboard';
 import { AIFeed } from './screens/AIFeed';
 import { Profile } from './screens/Profile';
-import { ScriptEditor } from './screens/ScriptEditor';
 import './components/NavBar.css';
+
+// Lazy: pulls in the locally bundled Monaco editor only when opened.
+const ScriptEditor = lazy(() =>
+  import('./screens/ScriptEditor').then(m => ({ default: m.ScriptEditor })));
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('dashboard');
@@ -73,7 +76,9 @@ function App() {
         user={user}
         onLogout={logout}
       />
-      <main>{renderScreen()}</main>
+      <main>
+        <Suspense fallback={null}>{renderScreen()}</Suspense>
+      </main>
     </div>
   );
 }

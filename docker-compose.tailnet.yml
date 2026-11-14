@@ -9,6 +9,12 @@
 # - Caddy binds to loopback only (127.0.0.1:8096) instead of 0.0.0.0:80/443,
 #   so the app is not exposed to the LAN and does not fight other services
 #   for 80/443. The tunnel is the only way in.
+# - TRUSTED_PROXIES lists the private ranges explicitly (not Caddy's
+#   `private_ranges`, which includes fc00::/7 and so the Tailscale IPv6 ULA
+#   fd7a:115c:a1e0::/48). Tailscale addresses are real clients, never proxies,
+#   so a tailnet client cannot forge its address. The only peer Caddy sees
+#   here is the docker bridge gateway (docker-proxy), which carries the
+#   address `tailscale serve` wrote.
 # - DOMAIN=":80" makes Caddy serve plain HTTP on any hostname and skip
 #   certificate management; HTTPS comes from the tunnel. The browser still
 #   sees https://, which the backend's Secure auth cookie requires.
@@ -18,3 +24,4 @@ services:
       - "127.0.0.1:${TAILNET_HOST_PORT:-8096}:80"
     environment:
       DOMAIN: ":80"
+      TRUSTED_PROXIES: "127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 ::1/128"

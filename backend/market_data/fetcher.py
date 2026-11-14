@@ -18,6 +18,12 @@ def _num_or_zero(value):
     return 0 if _is_bad(value) else value
 
 
+class UnknownTickerError(ValueError):
+    """Yahoo answered but has no usable quote for this symbol. A ValueError
+    subclass so existing callers that catch ValueError/Exception still work;
+    network/upstream failures raise other exceptions and stay distinct."""
+
+
 class MarketDataFetcher:
     """Fetches real NSE/BSE market data using yfinance"""
 
@@ -27,12 +33,14 @@ class MarketDataFetcher:
         nse_ticker = ticker if ticker.endswith(".NS") else f"{ticker}.NS"
         stock = yf.Ticker(nse_ticker)
         info = stock.info
-        price = info.get("currentPrice", info.get("regularMarketPrice", 0))
-        if _is_bad(price):
+        price = info.get("currentPrice", info.get("regularMarketPrice"))
+        # Yahoo returns an info dict with no price fields for a symbol it
+        # does not know, so a missing or non-positive price means "unknown".
+        if _is_bad(price) or float(price) <= 0:
             # Callers already treat a raised exception as "no usable quote"
             # (fallback price / refetch-failed rejection / error dict in
             # get_multiple_prices); NaN must not leak out as a price.
-            raise ValueError(f"No valid price available for {ticker}")
+            raise UnknownTickerError(f"No valid price available for {ticker}")
         return {
             "ticker": ticker.replace(".NS", ""),
             "price": price,

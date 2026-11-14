@@ -11,7 +11,7 @@ from api.token_revocation import is_revoked
 AUTH_COOKIE_NAME = "access_token"
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/json", auto_error=False)
 
 
 def _extract_token(request: Request, bearer_token: str | None) -> str | None:

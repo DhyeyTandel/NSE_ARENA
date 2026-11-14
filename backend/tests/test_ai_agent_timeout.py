@@ -72,3 +72,26 @@ def test_to_order_rejects_unrecognized_action():
         assert False, "expected ValueError"
     except ValueError as e:
         assert "short" in str(e)
+
+
+@pytest.mark.asyncio
+async def test_run_cycle_hides_raw_error_text_from_feed(monkeypatch, caplog):
+    agent = AIAgent(_portfolio(), order_engine=None)
+
+    class BadResponse:
+        choices = [SimpleNamespace(message=SimpleNamespace(
+            content='{"action": "buy", SECRET-DETAIL not json'))]
+
+    async def bad(*args, **kwargs):
+        return BadResponse()
+
+    monkeypatch.setattr(agent.client.chat.completions, "create", bad)
+
+    with caplog.at_level("WARNING"):
+        decision = await agent.run_cycle({"RELIANCE": {"price": 1000}})
+
+    assert decision["action"] == "hold"
+    assert "Parse error" not in decision["reason"]
+    assert "SECRET-DETAIL" not in decision["reason"]
+    assert "JSON" not in decision["reason"] and "line" not in decision["reason"]
+    assert "AI decision failed" in caplog.text  # detail is logged server-side

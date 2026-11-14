@@ -97,6 +97,7 @@ NSE_ARENA/
 │   ├── scripting/              # PineScript-lite parser & indicators
 │   ├── ai/                     # Groq-based AI trading agents
 │   ├── requirements.txt
+│   ├── requirements-dev.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
@@ -162,8 +163,8 @@ cd backend
 python -m venv venv
 source venv/bin/activate        # On Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (requirements-dev.txt adds pytest on top of requirements.txt)
+pip install -r requirements-dev.txt
 
 # Configure environment — SECRET_KEY is required, the app refuses to boot
 # without it. Everything else has a working default for local dev.
@@ -234,7 +235,7 @@ testing when `DOMAIN` is unset or `localhost`).
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/auth/register` | Create a new account |
-| `POST` | `/auth/login` | Get JWT access token |
+| `POST` | `/auth/login/json` | Get JWT access token (JSON body) |
 | `GET` | `/price/{ticker}` | Fetch OHLCV data for an NSE stock |
 | `POST` | `/trades/` | Place a buy/sell order |
 | `GET` | `/portfolio/` | Get current holdings and PnL |
@@ -298,7 +299,7 @@ sellSignal = ta.crossunder(fast, slow)
 ## 🔐 Auth Model
 
 JWTs are delivered to browsers in an **httpOnly, SameSite=Lax cookie**
-(`Secure` in production) set by `/auth/login`, `/auth/login/json`, and
+(`Secure` in production) set by `/auth/login/json` and
 `/auth/register` — never stored in `localStorage`, so an XSS payload
 cannot read the token. `POST /auth/logout` clears the cookie.
 

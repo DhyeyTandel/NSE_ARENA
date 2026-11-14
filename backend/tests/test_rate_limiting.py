@@ -1,7 +1,7 @@
 # tests/test_rate_limiting.py
 """Item 5 (ANTIGRAVITY_NEXT.md): Redis-backed rate limiting.
 
-/api/scripts/run, /auth/login (+ /auth/login/json), and /auth/register had
+/api/scripts/run, /auth/login/json, and /auth/register had
 no rate limiting at all — wide open to brute-force/enumeration and
 unbounded script execution. Uses a small in-memory fake standing in for
 the Redis client (AsyncMock's default children aren't awaitable, so the
@@ -106,20 +106,9 @@ async def test_login_rate_limited_after_5_per_minute(client):
 
 
 @pytest.mark.asyncio
-async def test_login_and_login_json_share_one_rate_limit_bucket(client):
-    """An attacker shouldn't be able to dodge the limit by switching
-    between /auth/login and /auth/login/json."""
-    for _ in range(5):
-        resp = await client.post("/auth/login/json", json={
-            "username": "nobody", "password": "wrong",
-        })
-        assert resp.status_code == 401
-
-    resp = await client.post(
-        "/auth/login",
-        data={"username": "nobody", "password": "wrong"},
-    )
-    assert resp.status_code == 429
+async def test_form_login_endpoint_removed(client):
+    resp = await client.post("/auth/login", data={"username": "nobody", "password": "wrong"})
+    assert resp.status_code in (404, 405)
 
 
 @pytest.mark.asyncio

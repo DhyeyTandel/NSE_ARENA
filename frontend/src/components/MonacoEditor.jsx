@@ -5,6 +5,7 @@
  */
 import { useRef, useCallback, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
+import '../monacoSetup';
 import { cssVar, getTheme, useThemeName } from '../theme';
 
 // ── PineScript-lite language definition (Monarch tokenizer) ────────────────
@@ -49,10 +50,14 @@ const PINE_STYLES = [
 ];
 
 
+let pineRegistered = false;
+
 function registerPineScript(monaco) {
   // Avoid re-registering
-  if (monaco.__pineRegistered) return;
-  monaco.__pineRegistered = true;
+  // Module-level flag: the bundled monaco is an ES module namespace
+  // object, which is frozen, so a flag cannot be stored on it.
+  if (pineRegistered) return;
+  pineRegistered = true;
 
   // Register language
   monaco.languages.register({ id: PINE_LANG_ID });

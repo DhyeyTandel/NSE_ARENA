@@ -1,6 +1,7 @@
 # ai/agent.py
 import asyncio
 import json
+import logging
 from groq import AsyncGroq
 from .risk_memory import AIRiskMemory
 from .guardrails import RiskGuardrail
@@ -8,7 +9,11 @@ from .prompts import SYSTEM_PROMPT, RESPONSE_FORMAT
 from config import GROQ_API_KEY, GROQ_MODEL
 from services.trading import TradeRejected
 
+logger = logging.getLogger(__name__)
+
 GROQ_CALL_TIMEOUT_SECONDS = 30
+# Shown on the public AI feed. Detail goes to the server log only.
+GENERIC_AI_ERROR_REASON = "No valid decision this cycle (model response could not be used)"
 
 
 class AIAgent:
@@ -46,7 +51,8 @@ class AIAgent:
                 "reason": f"Groq call timed out after {GROQ_CALL_TIMEOUT_SECONDS}s",
             }
         except Exception as e:
-            return {"action": "hold", "reason": f"Parse error: {e}"}
+            logger.warning("AI decision failed: %s: %s", type(e).__name__, e)
+            return {"action": "hold", "reason": GENERIC_AI_ERROR_REASON}
 
         # Guardrail check — AI cannot bypass this
         result = self.guardrail.validate(decision, self.portfolio, market_data)

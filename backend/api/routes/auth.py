@@ -1,8 +1,8 @@
 # api/routes/auth.py
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
@@ -112,7 +112,14 @@ async def register(request: RegisterRequest, http_request: Request, response: Re
         hashed_password=pwd_context.hash(request.password),
     )
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        # Lost a race against a concurrent registration, or hit the
+        # unique index on lower(username) / email.
+        await db.rollback()
+        taken = "Email" if "email" in str(e.orig).lower() else "Username"
+        raise HTTPException(status_code=400, detail=f"{taken} already registered")
 
     # Get active season
     result = await db.execute(select(Season).where(Season.is_active == True))
@@ -135,37 +142,10 @@ async def register(request: RegisterRequest, http_request: Request, response: Re
     return TokenResponse(access_token=token, user=user_info)
 
 
-@router.post("/login", response_model=TokenResponse)
-async def login(http_request: Request,
-                response: Response,
-                form_data: OAuth2PasswordRequestForm = Depends(),
-                db: AsyncSession = Depends(get_db)):
-    await check_rate_limit(
-        http_request, bucket="login", identity=client_ip(http_request),
-        limit=5, window_seconds=60
-    )
-
-    result = await db.execute(select(User).where(User.username == form_data.username))
-    user = result.scalar_one_or_none()
-
-    if not _verify_password(form_data.password, user):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = create_access_token(data={"sub": str(user.id)})
-    set_auth_cookie(response, token)
-    return TokenResponse(access_token=token)
-
-
 @router.post("/login/json", response_model=TokenResponse)
 async def login_json(request: LoginRequest, http_request: Request, response: Response,
                      db: AsyncSession = Depends(get_db)):
-    """JSON-body login alternative (used by the frontend)"""
-    # Same "login" bucket as /auth/login — otherwise an attacker just
-    # switches endpoints to dodge the limit.
+    """JSON-body login (used by the frontend)"""
     await check_rate_limit(
         http_request, bucket="login", identity=client_ip(http_request),
         limit=5, window_seconds=60

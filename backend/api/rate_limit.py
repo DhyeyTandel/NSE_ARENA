@@ -29,7 +29,22 @@ def _parse_ip(value: str):
     return ip
 
 
+# Tailscale address space. These are real client addresses, never proxy
+# hops: a tailnet peer must not be able to pass itself off as our proxy.
+# (The IPv6 ULA is inside fc00::/7, so is_private alone would trust it.)
+_TAILSCALE_NETS = (
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("fd7a:115c:a1e0::/48"),
+)
+
+
+def _is_tailscale(ip) -> bool:
+    return any(ip.version == net.version and ip in net for net in _TAILSCALE_NETS)
+
+
 def _is_internal(ip) -> bool:
+    if _is_tailscale(ip):
+        return False
     return ip.is_private or ip.is_loopback or ip.is_link_local
 
 
@@ -37,15 +52,14 @@ def resolve_client_ip(peer_host: str | None, forwarded_for: str | None) -> str:
     """The single place that decides which IP a request "comes from".
 
     X-Forwarded-For is only honoured when the direct socket peer is itself
-    a private/loopback address, i.e. our reverse proxy (Caddy container).
-    A peer on a public address is the client, and any header it sent is
-    ignored. Behind the proxy the header is read right to left, skipping
-    internal hops, so entries a client prepended cannot win. If the header
-    is malformed (any entry not an IP) the socket peer is used.
-
-    Deployment assumption: Caddy runs with `trusted_proxies static
-    private_ranges` (see Caddyfile) so it overwrites a forwarded IP sent
-    by a public peer.
+    a private/loopback address (our Caddy container, or the dev proxy).
+    Tailscale addresses (100.64.0.0/10, fd7a:115c:a1e0::/48) never count as
+    proxies, so a tailnet client that reaches us directly is the client and
+    its header is ignored. Behind Caddy only the rightmost entry is read:
+    Caddy overwrites X-Forwarded-For with the client address it resolved
+    (`header_up X-Forwarded-For {client_ip}`, see Caddyfile), so anything
+    further left is client-supplied and ignored. If the header is
+    malformed the socket peer is used.
     """
     if not peer_host:
         return "unknown"
@@ -56,10 +70,7 @@ def resolve_client_ip(peer_host: str | None, forwarded_for: str | None) -> str:
     hops = [_parse_ip(part) for part in forwarded_for.split(",")]
     if not hops or any(h is None for h in hops):
         return str(peer)
-    for hop in reversed(hops):
-        if not _is_internal(hop):
-            return str(hop)
-    return str(hops[0])  # every hop internal (e.g. a LAN/tailnet ULA client)
+    return str(hops[-1])
 
 
 def client_ip(conn: HTTPConnection) -> str:

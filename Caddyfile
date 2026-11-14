@@ -1,10 +1,20 @@
 {
-	# Trust X-Forwarded-For only from private peers (Tailscale Serve on the
-	# host / the docker bridge in private mode). A public peer's forwarded
-	# IP is overwritten with its real address, so clients cannot spoof the
-	# IP the backend rate-limits on.
+	# Which direct peers may supply X-Forwarded-For. Default: only Caddy's own
+	# loopback, i.e. nobody. Public mode (ports 80/443) must NOT trust the
+	# docker bridge: docker-proxy makes every connection look like it comes
+	# from the bridge gateway, so a forged header would be believed. The
+	# tailnet override sets this to the private ranges, because there
+	# `tailscale serve` -> 127.0.0.1 -> docker-proxy is the only way in and
+	# the header it writes is the tailnet client's address.
+	#
+	# Tailscale ranges (100.64.0.0/10, fd7a:115c:a1e0::/48) must never be
+	# listed: they are client addresses, and fc00::/7 (`private_ranges`)
+	# would swallow the IPv6 ULA, so the list is spelled out.
 	servers {
-		trusted_proxies static private_ranges
+		trusted_proxies static {$TRUSTED_PROXIES:127.0.0.1/32}
+		# Read X-Forwarded-For right to left and take the first address that
+		# is not a trusted proxy, instead of the (client-controlled) leftmost.
+		trusted_proxies_strict
 	}
 }
 
@@ -16,7 +26,12 @@
 	# `/leaderboard`, `/seasons` etc. at the bare path.
 	@backend path /auth/* /trades /trades/* /portfolio /portfolio/* /leaderboard /leaderboard/* /seasons /seasons/* /ai/* /api/* /price/* /score/* /ws/* /tickers /health /docs /redoc /openapi.json
 
-	reverse_proxy @backend backend:8000
+	# The backend trusts exactly one value: the client address Caddy resolved
+	# above. Overwriting X-Forwarded-For with it drops anything the client
+	# prepended (api/rate_limit.py resolve_client_ip reads this single value).
+	reverse_proxy @backend backend:8000 {
+		header_up X-Forwarded-For {client_ip}
+	}
 
 	# Everything else — the React SPA.
 	reverse_proxy frontend:80

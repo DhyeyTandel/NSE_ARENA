@@ -286,6 +286,29 @@ def _ohlcv_ttl(range_: str) -> int:
     return PRICE_CACHE_TTL_SECONDS
 
 
+UNKNOWN_TICKER_TTL_SECONDS = 300
+
+
+def _unknown_ticker_key(ticker: str) -> str:
+    return f"unknown_ticker:{ticker}"
+
+
+async def _is_known_unknown(ticker: str) -> bool:
+    try:
+        return await broadcaster.redis.get(_unknown_ticker_key(ticker)) in (b"1", "1")
+    except Exception as e:
+        logger.debug("Unknown-ticker cache read skipped for %s: %s", ticker, e)
+        return False
+
+
+async def _remember_unknown(ticker: str) -> None:
+    try:
+        await broadcaster.redis.set(
+            _unknown_ticker_key(ticker), "1", ex=UNKNOWN_TICKER_TTL_SECONDS)
+    except Exception as e:
+        logger.debug("Unknown-ticker cache write skipped for %s: %s", ticker, e)
+
+
 async def _read_ohlcv_cache(ticker: str, range_: str = DEFAULT_PRICE_RANGE):
     try:
         raw = await broadcaster.redis.get(_ohlcv_cache_key(ticker, range_))
@@ -312,7 +335,7 @@ async def get_price(ticker: str, request: Request, range: str = DEFAULT_PRICE_RA
     (60s; 30s for 1D/1W while the market is open)."""
     from api.rate_limit import check_rate_limit, client_ip
     from api.validation import normalize_ticker
-    from market_data.fetcher import MarketDataFetcher
+    from market_data.fetcher import MarketDataFetcher, UnknownTickerError
 
     await check_rate_limit(request, bucket="price", identity=client_ip(request),
                            limit=PRICE_RATE_LIMIT, window_seconds=60)
@@ -323,6 +346,9 @@ async def get_price(ticker: str, request: Request, range: str = DEFAULT_PRICE_RA
         raise HTTPException(status_code=400, detail="Invalid range")
     period, interval = PRICE_RANGES[range]
 
+    if await _is_known_unknown(symbol):
+        raise HTTPException(status_code=404, detail="Unknown ticker")
+
     try:
         live = await broadcaster.get_cached_price(symbol)
     except Exception as e:  # Redis down: fall through to yfinance
@@ -330,18 +356,30 @@ async def get_price(ticker: str, request: Request, range: str = DEFAULT_PRICE_RA
         live = None
 
     ohlcv = await _read_ohlcv_cache(symbol, range)
-    if ohlcv is None and live:
-        ohlcv = await asyncio.to_thread(
-            MarketDataFetcher.get_ohlcv, symbol, period=period, interval=interval)
-        await _write_ohlcv_cache(symbol, ohlcv, range)
-    elif ohlcv is None:
-        ohlcv, live = await asyncio.gather(
-            asyncio.to_thread(MarketDataFetcher.get_ohlcv, symbol, period=period, interval=interval),
-            asyncio.to_thread(MarketDataFetcher.get_price, symbol),
-        )
-        await _write_ohlcv_cache(symbol, ohlcv, range)
-    elif not live:
-        live = await asyncio.to_thread(MarketDataFetcher.get_price, symbol)
+    try:
+        if ohlcv is None and live:
+            ohlcv = await asyncio.to_thread(
+                MarketDataFetcher.get_ohlcv, symbol, period=period, interval=interval)
+            await _write_ohlcv_cache(symbol, ohlcv, range)
+        elif ohlcv is None:
+            ohlcv, live = await asyncio.gather(
+                asyncio.to_thread(MarketDataFetcher.get_ohlcv, symbol, period=period, interval=interval),
+                asyncio.to_thread(MarketDataFetcher.get_price, symbol),
+            )
+            await _write_ohlcv_cache(symbol, ohlcv, range)
+        elif not live:
+            live = await asyncio.to_thread(MarketDataFetcher.get_price, symbol)
+    except UnknownTickerError:
+        # Yahoo answered but has nothing for this symbol: cache the miss so
+        # repeat requests do not re-query it.
+        # A listed ticker is never cached as a miss (it would be a Yahoo blip).
+        if symbol not in DEFAULT_TICKERS:
+            await _remember_unknown(symbol)
+        raise HTTPException(status_code=404, detail="Unknown ticker")
+    except Exception as e:
+        # Transient upstream failure: never cached as a miss.
+        logger.warning("Market data fetch failed for %s: %s", symbol, type(e).__name__)
+        raise HTTPException(status_code=502, detail="Market data temporarily unavailable")
 
     return {"ticker": symbol, "current": live, "ohlcv": ohlcv, "range": range, "interval": interval}
 

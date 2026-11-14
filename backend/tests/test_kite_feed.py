@@ -4,6 +4,7 @@ status/login/callback routes and "feature off". Everything is mocked; no
 network, no real kiteconnect calls.
 """
 import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -293,16 +294,47 @@ async def test_unconfigured_feed_is_inert():
 
 # ── routes ───────────────────────────────────────────────────────────
 
+class _StateRedis:
+    """Just enough Redis for rate limiting + the single-use Kite state."""
+    def __init__(self):
+        self.store = {}
+
+    async def incr(self, key):
+        self.store[key] = int(self.store.get(key, 0)) + 1
+        return self.store[key]
+
+    async def expire(self, key, seconds):
+        pass
+
+    async def set(self, key, value, ex=None):
+        self.store[key] = value
+
+    async def getdel(self, key):
+        return self.store.pop(key, None)
+
+
+def seed_state(app, state="abc", user_id=1):
+    app.state.broadcaster.redis.store["kite_oauth_state:" + state] = str(user_id)
+
+
 @pytest.fixture
 def client_and_feed():
     from main import app
+    from api.dependencies import get_current_user
+    import config
     feed, _ = make_feed()
     old = app.state.kite_feed
+    old_pb = getattr(app.state, "broadcaster", None)
     app.state.kite_feed = feed
+    app.state.broadcaster = SimpleNamespace(redis=_StateRedis())
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        id=1, username="boss", is_ai=False)
     try:
-        yield TestClient(app, follow_redirects=False), feed, app
+        with patch.object(config, "ADMIN_USERNAMES", {"boss"}):
+            yield TestClient(app, follow_redirects=False), feed, app
     finally:
         app.state.kite_feed = old
+        app.state.broadcaster = old_pb
         app.dependency_overrides.clear()
 
 
@@ -328,44 +360,45 @@ def test_status_connected(client_and_feed):
 
 
 def test_login_and_disconnect_require_auth(client_and_feed):
-    client, _, _ = client_and_feed
+    client, _, app = client_and_feed
+    app.dependency_overrides.clear()
     assert client.get("/api/kite/login").status_code == 401
     assert client.post("/api/kite/disconnect").status_code == 401
+    assert client.get("/api/kite/callback?state=x").status_code == 401
 
 
-def test_login_redirects_with_api_key_and_state_cookie(client_and_feed):
-    from api.dependencies import require_admin
+def test_login_redirects_with_api_key_and_server_side_state(client_and_feed):
     client, _, app = client_and_feed
-    app.dependency_overrides[require_admin] = lambda: MagicMock()
     with patch.object(kf, "_sdk", return_value=FAKE_SDK):
         r = client.get("/api/kite/login")
     assert r.status_code == 302
     loc = r.headers["location"]
     assert loc.startswith("https://kite.example/login?api_key=key&v=3&redirect_params=state%3D")
     state = loc.split("state%3D")[1]
-    set_cookie = r.headers["set-cookie"]
-    assert f"kite_oauth_state={state}" in set_cookie and "HttpOnly" in set_cookie
+    assert app.state.broadcaster.redis.store["kite_oauth_state:" + state] == "1"
+    assert "set-cookie" not in r.headers
 
 
 def test_callback_failures_redirect_without_leaking(client_and_feed):
-    client, feed, _ = client_and_feed
+    client, feed, app = client_and_feed
     feed.login = AsyncMock(side_effect=RuntimeError("SECRET-ACCESS-TOKEN"))
 
-    # no state cookie
+    # no stored state
     r = client.get("/api/kite/callback?request_token=RT&status=success&state=abc")
     assert r.status_code == 302 and r.headers["location"] == "/?kite=error"
     feed.login.assert_not_awaited()
 
-    client.cookies.set("kite_oauth_state", "abc", path="/api/kite")
+    seed_state(app)
     # wrong state
     r = client.get("/api/kite/callback?request_token=RT&status=success&state=zzz")
     assert r.headers["location"] == "/?kite=error"
     # Zerodha reported failure
+    seed_state(app)
     r = client.get("/api/kite/callback?request_token=RT&status=error&state=abc")
     assert r.headers["location"] == "/?kite=error"
     feed.login.assert_not_awaited()
     # exchange raises: redirect, nothing echoed
-    client.cookies.set("kite_oauth_state", "abc", path="/api/kite")
+    seed_state(app)
     r = client.get("/api/kite/callback?request_token=RT&status=success&state=abc")
     assert r.headers["location"] == "/?kite=error"
     assert "SECRET-ACCESS-TOKEN" not in r.text and "RT" not in r.headers["location"]
@@ -373,17 +406,15 @@ def test_callback_failures_redirect_without_leaking(client_and_feed):
 
 
 def test_callback_success_redirects_home(client_and_feed):
-    client, feed, _ = client_and_feed
+    client, feed, app = client_and_feed
     feed.login = AsyncMock(return_value=True)
-    client.cookies.set("kite_oauth_state", "abc", path="/api/kite")
+    seed_state(app)
     r = client.get("/api/kite/callback?request_token=RT&status=success&state=abc")
     assert r.status_code == 302 and r.headers["location"] == "/"
 
 
 def test_disconnect_stops_feed(client_and_feed):
-    from api.dependencies import require_admin
     client, feed, app = client_and_feed
-    app.dependency_overrides[require_admin] = lambda: MagicMock()
     feed.stop = AsyncMock()
     r = client.post("/api/kite/disconnect")
     assert r.status_code == 200
@@ -392,14 +423,14 @@ def test_disconnect_stops_feed(client_and_feed):
 
 def test_callback_honors_frontend_url(client_and_feed):
     import config
-    client, feed, _ = client_and_feed
+    client, feed, app = client_and_feed
     feed.login = AsyncMock(return_value=True)
     with patch.object(config, "FRONTEND_URL", "http://localhost:5173"):
-        client.cookies.set("kite_oauth_state", "abc", path="/api/kite")
+        seed_state(app)
         r = client.get("/api/kite/callback?request_token=RT&status=success&state=abc"
                        "&next=http://evil.example")
         assert r.headers["location"] == "http://localhost:5173/"
-        client.cookies.set("kite_oauth_state", "abc", path="/api/kite")
+        seed_state(app)
         r = client.get("/api/kite/callback?request_token=RT&status=error&state=abc")
         assert r.headers["location"] == "http://localhost:5173/?kite=error"
 

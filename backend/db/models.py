@@ -1,7 +1,7 @@
 # db/models.py
 from decimal import Decimal
 
-from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime, ForeignKey, Boolean, Text, CheckConstraint, Index
+from sqlalchemy import Column, Integer, String, Float, Numeric, DateTime, ForeignKey, Boolean, Text, CheckConstraint, Index, func
 from sqlalchemy.orm import relationship
 from database import Base, db_utcnow
 
@@ -12,6 +12,8 @@ from database import Base, db_utcnow
 # cash_balance >= 0 CheckConstraint on a balance that's actually zero.
 # Ratios/percentages/scores (position_size_pct, TraderScore.*) stay Float —
 # they're derived display values, not accumulated ledger amounts.
+
+USERNAME_LOWER_INDEX = "ix_users_username_lower"
 
 
 class User(Base):
@@ -26,6 +28,12 @@ class User(Base):
 
     portfolios = relationship("Portfolio", back_populates="user")
     trader_scores = relationship("TraderScore", back_populates="user")
+
+    # Case-insensitive uniqueness ("Admin" vs "admin"). create_all only
+    # builds this for new tables; database.init_db adds it to existing ones.
+    __table_args__ = (
+        Index(USERNAME_LOWER_INDEX, func.lower(username), unique=True),
+    )
 
 
 class Season(Base):
