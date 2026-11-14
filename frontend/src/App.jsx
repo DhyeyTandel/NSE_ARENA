@@ -8,6 +8,7 @@ import { Leaderboard } from './screens/Leaderboard';
 import { AIFeed } from './screens/AIFeed';
 import { Profile } from './screens/Profile';
 import { ScriptEditor } from './screens/ScriptEditor';
+import './components/NavBar.css';
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('dashboard');
@@ -24,23 +25,17 @@ function App() {
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh', background: 'var(--paper)',
+        minHeight: '100vh', background: 'var(--canvas)',
         display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: '16px',
+        alignItems: 'center', justifyContent: 'center', gap: 'var(--s4)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span style={{
-            width: '7px', height: '7px', borderRadius: '999px',
-            background: 'var(--accent)', display: 'inline-block',
-          }} />
-          <span style={{
-            fontFamily: '"Newsreader", Georgia, serif',
-            fontSize: '21px', fontWeight: 500, letterSpacing: '-0.02em',
-          }}>NSE Arena</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', fontWeight: 600, fontSize: '16px' }}>
+          <span className="nav-mark" aria-hidden="true">N</span>
+          NSE Arena
         </div>
         <div style={{
           width: '24px', height: '24px',
-          border: '2px solid var(--faint)',
+          border: '2px solid var(--border)',
           borderTopColor: 'var(--accent)',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
@@ -58,7 +53,7 @@ function App() {
       case 'dashboard':
         return <Dashboard authenticated={authenticated} user={user} />;
       case 'leaderboard':
-        return <Leaderboard />;
+        return <Leaderboard authenticated={authenticated} user={user} />;
       case 'ai-feed':
         return <AIFeed />;
       case 'scripts':
@@ -71,7 +66,7 @@ function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--paper)', color: 'var(--ink)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--canvas)', color: 'var(--text)' }}>
       <NavBar
         activeScreen={activeScreen}
         onNavigate={setActiveScreen}

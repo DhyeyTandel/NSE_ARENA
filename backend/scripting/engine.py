@@ -33,6 +33,10 @@ from scripting import indicators as ta
 
 logger = logging.getLogger(__name__)
 
+# Wall-clock budget for one script run. Kept short because the API route's
+# HTTP timeout cannot stop the worker thread; this is the real limit.
+EXECUTION_BUDGET_SECONDS = 3.0
+
 # ── Data structures ─────────────────────────────────────────────────────────
 
 @dataclass
@@ -245,8 +249,8 @@ class PineEngine:
         lines = code.strip().split("\n")
         i = 0
         while i < len(lines):
-            if time.perf_counter() - self.start_time > 8.0:
-                raise TimeoutError("Script execution timed out (8s CPU limit)")
+            if time.perf_counter() - self.start_time > EXECUTION_BUDGET_SECONDS:
+                raise TimeoutError(f"Script execution timed out ({EXECUTION_BUDGET_SECONDS:g}s limit)")
             line = lines[i].strip()
             i += 1
 
@@ -454,8 +458,8 @@ class PineEngine:
 
     def _eval_expr(self, expr: str) -> Any:
         """Evaluate an expression and return a value (array, scalar, or string)."""
-        if time.perf_counter() - self.start_time > 8.0:
-            raise TimeoutError("Script execution timed out (8s CPU limit)")
+        if time.perf_counter() - self.start_time > EXECUTION_BUDGET_SECONDS:
+            raise TimeoutError(f"Script execution timed out ({EXECUTION_BUDGET_SECONDS:g}s limit)")
         expr = expr.strip()
 
         # String literal

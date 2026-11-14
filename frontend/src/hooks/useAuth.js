@@ -13,6 +13,22 @@ const api = axios.create({
   headers: { 'X-Requested-With': 'XMLHttpRequest' },
 });
 
+// FastAPI returns `detail` as a string for HTTPException but as a list of
+// {loc, msg, ...} objects for 422 validation errors. Render either readably.
+export function formatApiError(detail, fallback) {
+  if (typeof detail === 'string' && detail) return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const messages = detail.map((item) => {
+      if (typeof item === 'string') return item;
+      const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : null;
+      const msg = (item?.msg || '').replace(/^Value error, /, '');
+      return field && field !== 'body' ? `${field}: ${msg}` : msg;
+    }).filter(Boolean);
+    if (messages.length) return messages.join('. ');
+  }
+  return fallback;
+}
+
 export function useAuth() {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
@@ -44,7 +60,7 @@ export function useAuth() {
       setUser(response.data.user);
       return true;
     } catch (err) {
-      const detail = err.response?.data?.detail || 'Login failed';
+      const detail = formatApiError(err.response?.data?.detail, 'Login failed');
       setError(detail);
       return false;
     }
@@ -58,7 +74,7 @@ export function useAuth() {
       setUser(response.data.user);
       return true;
     } catch (err) {
-      const detail = err.response?.data?.detail || 'Registration failed';
+      const detail = formatApiError(err.response?.data?.detail, 'Registration failed');
       setError(detail);
       return false;
     }

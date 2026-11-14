@@ -1,11 +1,14 @@
 // screens/Dashboard.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import axios from 'axios';
 import { TradingViewChart } from '../components/TradingViewChart';
 import { OrderPanel } from '../components/OrderPanel';
 import { PositionsTable } from '../components/PositionsTable';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { usePortfolio } from '../hooks/usePortfolio';
+import { useSeasonStanding } from '../hooks/useSeasonStanding';
 import { API_URL, WS_URL } from '../config';
+import './Dashboard.css';
 
 const DEMO_POSITIONS = [
   { ticker: 'RELIANCE', quantity: 10, avg_price: 2847.30, current_price: 2891.45, state: 'confirmed' },
@@ -13,25 +16,50 @@ const DEMO_POSITIONS = [
   { ticker: 'INFY', quantity: 15, avg_price: 1520.75, current_price: 1548.20, state: 'pending' },
 ];
 
-const WATCHLIST = [
-  { ticker: 'RELIANCE', chg: '+1.55%' },
-  { ticker: 'TCS', chg: '−0.88%' },
-  { ticker: 'INFY', chg: '+1.81%' },
-  { ticker: 'HDFCBANK', chg: '+0.42%' },
-  { ticker: 'TATAMOTORS', chg: '−1.12%' },
-];
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
 
 export function Dashboard({ authenticated, user }) {
   const [selectedTicker, setSelectedTicker] = useState('RELIANCE');
+  const [chartRange, setChartRange] = useState('1M');
+  const [watchlist, setWatchlist] = useState(null); // null until /tickers answers
+  const [filter, setFilter] = useState('');
+  const [orderSide, setOrderSide] = useState('buy');
+  const [wlOpen, setWlOpen] = useState(false); // collapsible on narrow screens only
   const { portfolio, refetch: refetchPortfolio } = usePortfolio(authenticated);
   const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL, authenticated);
+
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${API_URL}/tickers`)
+      .then(res => { if (!cancelled && Array.isArray(res.data?.tickers)) setWatchlist(res.data.tickers); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Optional Kite Connect real-time feed: only offer "Connect Kite" when the
+  // backend has keys but no live session.
+  const [kite, setKite] = useState(null);
+  const isAdmin = !!user?.is_admin;
+  const refreshKite = () => axios.get(`${API_URL}/api/kite/status`)
+    .then(res => setKite(res.data))
+    .catch(() => {});
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${API_URL}/api/kite/status`)
+      .then(res => { if (!cancelled) setKite(res.data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const disconnectKite = () => axios.post(
+    `${API_URL}/api/kite/disconnect`, null,
+    { withCredentials: true, headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+  ).then(refreshKite).catch(() => {});
+
+  // Backend list, or (if /tickers failed) whatever has ticked on the socket.
+  const watchTickers = useMemo(() => {
+    const list = watchlist ?? Object.keys(livePrices);
+    const q = filter.trim().toUpperCase();
+    return q ? list.filter(t => t.toUpperCase().includes(q)) : list;
+  }, [watchlist, livePrices, filter]);
 
   const positions = useMemo(() => {
     // DEMO_POSITIONS is a preview for logged-out visitors only. Once
@@ -41,6 +69,8 @@ export function Dashboard({ authenticated, user }) {
     if (!authenticated) return DEMO_POSITIONS;
     return portfolio?.holdings ?? [];
   }, [portfolio, authenticated]);
+
+  const standing = useSeasonStanding(authenticated, user);
 
   const startingCapital = portfolio?.starting_capital || 100000;
 
@@ -66,8 +96,24 @@ export function Dashboard({ authenticated, user }) {
   }, [positions, livePrices, portfolio, startingCapital]);
 
   const selectedLivePrice = livePrices[selectedTicker];
-  const displayPrice = selectedLivePrice?.price || 2891.45;
-  const displayChangePct = selectedLivePrice?.change_pct || 1.55;
+  const displayPrice = selectedLivePrice?.price ?? null;
+  const displayChangePct = selectedLivePrice?.change_pct ?? null;
+
+  // Badge states. "Live" only when the socket is up AND the backend says NSE
+  // is open; a connected socket outside market hours is showing the last close.
+  const marketOpen = Object.values(livePrices).find(p => typeof p?.market_open === 'boolean')?.market_open;
+  // The selected ticker's source wins; otherwise any tick that carries one.
+  const source = selectedLivePrice?.source
+    ?? Object.values(livePrices).find(p => p?.source)?.source;
+  const feed = !wsConnected
+    ? { label: 'Offline', dot: 'var(--loss)', color: 'var(--text-2)', pulse: false }
+    : marketOpen === true
+      ? source === 'yahoo'
+        ? { label: 'Delayed', dot: 'var(--gain)', color: 'var(--text-2)', pulse: false }
+        : { label: 'Live', dot: 'var(--gain)', color: 'var(--gain-text)', pulse: true }
+      : marketOpen === false
+        ? { label: 'Market closed', dot: 'var(--text-2)', color: 'var(--text-2)', pulse: false }
+        : { label: 'Connecting', dot: 'var(--text-2)', color: 'var(--text-2)', pulse: false };
 
   const handleSubmit = async (order) => {
     if (!authenticated) return;
@@ -83,178 +129,154 @@ export function Dashboard({ authenticated, user }) {
   };
 
   const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+  const px = n => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—');
   const pnlUp = stats.pnl >= 0;
+  const signed = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}%`;
+  const chgClass = v => (typeof v !== 'number' ? 'muted' : v >= 0 ? 'up' : 'dn');
+
+  const prevClose = selectedLivePrice?.previous_close;
+  const absChange = typeof displayPrice === 'number' && typeof prevClose === 'number' ? displayPrice - prevClose : null;
+  const keyStats = [
+    ['Open', selectedLivePrice?.open, px],
+    ['High', selectedLivePrice?.day_high, px],
+    ['Low', selectedLivePrice?.day_low, px],
+    ['Prev. close', prevClose, px],
+    ['Volume', selectedLivePrice?.volume, v => (typeof v === 'number' ? v.toLocaleString('en-IN') : '—')],
+  ];
+
+  const pickTicker = (ticker, side) => {
+    setSelectedTicker(ticker);
+    if (side) setOrderSide(side);
+  };
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s var(--ease-swift)' }}>
-      {/* Season ink band */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '28px',
-        padding: '12px 32px',
-        background: 'var(--ink-surface)', color: 'var(--on-ink)',
-      }}>
-        <div className="t-eyebrow" style={{ color: 'var(--on-ink-muted)' }}>
-          Season 4 · Monsoon
+    <div className="dash">
+      {/* Watchlist */}
+      <aside className={`wl${wlOpen ? '' : ' wl--collapsed'}`} aria-label="Watchlist">
+        <button type="button" className="wl-toggle" aria-expanded={wlOpen} onClick={() => setWlOpen(o => !o)}>
+          <span>Watchlist</span>
+          <span>{selectedTicker} · {wlOpen ? 'Hide' : 'Show'}</span>
+        </button>
+        <div className="wl-search">
+          <input
+            type="text" className="input" value={filter} onChange={e => setFilter(e.target.value)}
+            placeholder="Search stocks" aria-label="Filter tickers"
+          />
         </div>
-        <div style={{ fontSize: '14px', color: 'var(--on-ink-muted)' }}>
-          Ends in <strong style={{ color: 'var(--on-ink)' }}>12 days</strong>
-        </div>
-        <div style={{ fontSize: '14px', color: 'var(--on-ink-muted)' }}>
-          Your rank <strong style={{ color: 'var(--on-ink)' }}>#23</strong>{' '}
-          <span style={{ color: '#4ADE80' }}>▲2 today</span>
-        </div>
-        <div style={{ fontSize: '14px', color: 'var(--on-ink-muted)' }}>
-          1,204 traders competing
-        </div>
-      </div>
-
-      <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '24px 32px 40px' }}>
-        {/* Greeting */}
-        <div style={{
-          display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '18px',
-          animation: 'fadeInUp 0.4s var(--ease-swift)',
-        }}>
-          <div className="t-display" style={{ fontSize: '28px' }}>
-            {getGreeting()}, <em>{user?.username || 'Trader'}</em>
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--muted)' }}>{today}</div>
-        </div>
-
-        {/* KPI strip */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-          background: 'var(--card)', border: '1px solid var(--faint)',
-          borderRadius: 'var(--r-card)', overflow: 'hidden', marginBottom: '16px',
-        }}>
-          <div style={{ padding: '18px 22px', borderRight: '1px solid var(--faint)' }}>
-            <div className="t-label" style={{ marginBottom: '8px' }}>Portfolio value</div>
-            <div className="t-kpi" style={{ fontSize: '24px' }}>{inr(stats.totalValue)}</div>
-            <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
-              {inr(stats.cashBalance)} in cash
-            </div>
-          </div>
-          <div style={{ padding: '18px 22px', borderRight: '1px solid var(--faint)' }}>
-            <div className="t-label" style={{ marginBottom: '8px' }}>Season P&L</div>
-            <div className="t-kpi" style={{ fontSize: '24px', color: pnlUp ? 'var(--success)' : 'var(--error)' }}>
-              {pnlUp ? '+' : '−'}{inr(Math.abs(stats.pnl))}
-            </div>
-            <div style={{ fontSize: '13px', color: pnlUp ? 'var(--success)' : 'var(--error)', marginTop: '4px' }}>
-              {pnlUp ? '+' : ''}{stats.pnlPct.toFixed(1)}% on ₹1L capital
-            </div>
-          </div>
-          <div style={{ padding: '18px 22px', borderRight: '1px solid var(--faint)' }}>
-            <div className="t-label" style={{ marginBottom: '8px' }}>Trader score</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-              <div className="t-kpi" style={{ fontSize: '24px' }}>412</div>
-              <div style={{
-                fontSize: '12.5px', fontWeight: 560, padding: '2px 10px',
-                borderRadius: '999px', background: 'var(--accent-soft)', color: 'var(--accent-deep)',
-              }}>Consistent</div>
-            </div>
-            <div style={{
-              height: '4px', background: 'var(--faint-soft)', borderRadius: '999px',
-              marginTop: '10px', overflow: 'hidden',
-            }}>
-              <div style={{ width: '41%', height: '100%', background: 'var(--accent)', borderRadius: '999px' }} />
-            </div>
-          </div>
-          <div style={{ padding: '18px 22px' }}>
-            <div className="t-label" style={{ marginBottom: '8px' }}>Season rank</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-              <div className="t-kpi" style={{ fontSize: '24px' }}>#23</div>
-              <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 560 }}>▲2</div>
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
-              ₹1,840 behind #22
-            </div>
-          </div>
-        </div>
-
-        {/* Chart + Order panel */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 336px',
-          background: 'var(--card)', border: '1px solid var(--faint)',
-          borderRadius: 'var(--r-card)', overflow: 'hidden', marginBottom: '16px',
-        }}>
-          {/* Chart */}
-          <div style={{ padding: '20px 24px', borderRight: '1px solid var(--faint)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '6px' }}>
-              <div className="t-title" style={{ fontSize: '24px' }}>{selectedTicker}</div>
-              <div className="t-mono" style={{ color: 'var(--muted)' }}>NSE : {selectedTicker}</div>
-              <div style={{
-                marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
-              }}>
-                <span style={{
-                  width: '6px', height: '6px', borderRadius: '999px',
-                  background: wsConnected ? 'var(--success)' : 'var(--error)',
-                  animation: wsConnected ? 'pulse 2s infinite' : 'none',
-                }} />
-                <span className="t-mono-sm" style={{
-                  color: wsConnected ? 'var(--success)' : 'var(--muted)',
-                  textTransform: 'uppercase', letterSpacing: '.08em',
-                }}>
-                  {wsConnected ? 'Live' : 'Offline'}
+        <ul className="wl-list" data-testid="watchlist" role="listbox" aria-label="Stocks">
+          {watchTickers.map((ticker) => {
+            const chg = livePrices[ticker]?.change_pct;
+            const last = livePrices[ticker]?.price;
+            const hasChg = typeof chg === 'number';
+            const selected = ticker === selectedTicker;
+            return (
+              <li
+                key={ticker} data-ticker={ticker} role="option" aria-selected={selected} tabIndex={0}
+                className={`wl-row${selected ? ' is-selected' : ''}`}
+                onClick={() => pickTicker(ticker)}
+                onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickTicker(ticker); } }}
+              >
+                <span className="wl-sym">{ticker}</span>
+                <span className={`wl-chg ${hasChg ? chgClass(chg) : 'muted'}`}>{hasChg ? signed(chg) : '—'}</span>
+                <span className="wl-px">{typeof last === 'number' ? last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</span>
+                <span className="wl-actions">
+                  <button type="button" className="wl-b" aria-label={`Buy ${ticker}`} title="Buy"
+                    onClick={e => { e.stopPropagation(); pickTicker(ticker, 'buy'); }}>B</button>
+                  <button type="button" className="wl-s" aria-label={`Sell ${ticker}`} title="Sell"
+                    onClick={e => { e.stopPropagation(); pickTicker(ticker, 'sell'); }}>S</button>
                 </span>
-              </div>
-            </div>
-            <div style={{
-              display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '14px',
-            }}>
-              <div className="t-kpi" style={{ fontSize: '20px' }}>
-                ₹{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="t-mono" style={{
-                color: displayChangePct >= 0 ? 'var(--success)' : 'var(--error)',
-                fontWeight: 500,
-              }}>
-                {displayChangePct >= 0 ? '+' : ''}{displayChangePct.toFixed(2)}%
-              </div>
-            </div>
-            <TradingViewChart key={selectedTicker} symbol={selectedTicker} height={380} />
-            {/* Watchlist pills */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-              {WATCHLIST.map((w) => {
-                const isActive = w.ticker === selectedTicker;
-                const isUp = w.chg[0] === '+';
-                return (
-                  <button key={w.ticker} onClick={() => setSelectedTicker(w.ticker)} style={{
-                    border: `1px solid ${isActive ? 'var(--accent)' : 'var(--faint)'}`,
-                    cursor: 'pointer',
-                    background: isActive ? 'var(--accent-soft)' : 'var(--card)',
-                    borderRadius: '999px', padding: '6px 14px',
-                    display: 'flex', alignItems: 'baseline', gap: '8px',
-                    fontFamily: '"JetBrains Mono", monospace', fontSize: '12px',
-                    transition: 'all var(--dur-fast) var(--ease-swift)',
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-                  >
-                    <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{w.ticker}</span>
-                    <span style={{ color: isUp ? 'var(--success)' : 'var(--error)' }}>{w.chg}</span>
-                  </button>
-                );
-              })}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="wl-foot">{watchTickers.length} {watchTickers.length === 1 ? 'stock' : 'stocks'}</div>
+      </aside>
+
+      {/* Content */}
+      <div className="dash-main">
+        <div className="stats">
+          <div className="stat">
+            <div className="stat-label">Portfolio value</div>
+            <div className="stat-value">{inr(stats.totalValue)}</div>
+            <div className="stat-sub">{inr(stats.cashBalance)} in cash</div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">Season P&L</div>
+            <div className={`stat-value ${pnlUp ? 'up' : 'dn'}`}>{pnlUp ? '+' : '−'}{inr(Math.abs(stats.pnl))}</div>
+            <div className={`stat-sub ${pnlUp ? 'up' : 'dn'}`}>{pnlUp ? '+' : ''}{stats.pnlPct.toFixed(1)}% on ₹1L capital</div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">Trader score</div>
+            <div className="stat-value">
+              {standing.score ? standing.score.final_score : '—'}
+              {standing.score?.grade && <> <span className="chip chip--ai" style={{ verticalAlign: 'middle' }}>{standing.score.grade}</span></>}
             </div>
           </div>
-
-          {/* Order panel */}
-          <div style={{ background: 'var(--paper-lift)' }}>
-            <OrderPanel
-              defaultSymbol={selectedTicker}
-              onSubmit={handleSubmit}
-              livePrice={displayPrice}
-              authenticated={authenticated}
-              cashBalance={stats.cashBalance}
-            />
+          <div className="stat">
+            <div className="stat-label">Rank</div>
+            <div className="stat-value">{standing.rank != null ? `#${standing.rank}` : '—'}</div>
+            {standing.gapToNext != null && (
+              <div className="stat-sub">{inr(standing.gapToNext)} behind #{standing.aheadRank}</div>
+            )}
           </div>
         </div>
 
-        {/* Positions */}
-        <div style={{
-          background: 'var(--card)', border: '1px solid var(--faint)',
-          borderRadius: 'var(--r-card)', overflow: 'hidden',
-        }}>
+        <div className="sv-head">
+          <div>
+            <div className="sv-sym">
+              <h2>{selectedTicker}</h2>
+              <span className="chip">NSE</span>
+            </div>
+            <div className="sv-price">{displayPrice != null ? px(displayPrice) : '—'}</div>
+            <div className="sv-chg">
+              <span className={chgClass(displayChangePct)}>
+                {displayChangePct == null ? '—' : signed(displayChangePct)}
+              </span>
+              {absChange != null && (
+                <span className={chgClass(absChange)}>{absChange >= 0 ? '+' : '−'}₹{Math.abs(absChange).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              )}
+            </div>
+          </div>
+          <div className="feed">
+            <span className="feed-dot" style={{ background: feed.dot, animation: feed.pulse ? 'pulse 2s infinite' : 'none' }} />
+            <span style={{ color: feed.color, fontWeight: 500 }}>{feed.label}</span>
+            {isAdmin && kite?.configured && kite.connected && (
+              <button type="button" onClick={disconnectKite} className="link-btn">Disconnect Kite</button>
+            )}
+            {isAdmin && kite?.configured && !kite.connected && (
+              <a href={`${API_URL}/api/kite/login`} className="link-btn">Connect Kite</a>
+            )}
+          </div>
+        </div>
+
+        <div className="sv-grid">
+          <div className="panel">
+            <div className="sv-chart">
+              <TradingViewChart key={selectedTicker} symbol={selectedTicker} height={360}
+                range={chartRange} onRangeChange={setChartRange} />
+            </div>
+            <dl className="keystats keystats-wrap">
+              {keyStats.map(([label, value, fmt]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{typeof value === 'number' ? fmt(value) : '—'}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <OrderPanel
+            defaultSymbol={selectedTicker}
+            onSubmit={handleSubmit}
+            livePrice={displayPrice ?? 0}
+            authenticated={authenticated}
+            cashBalance={stats.cashBalance}
+            side={orderSide}
+            onSideChange={setOrderSide}
+          />
+        </div>
+
+        <div className="panel">
           <PositionsTable positions={positions} livePrices={livePrices} />
         </div>
       </div>

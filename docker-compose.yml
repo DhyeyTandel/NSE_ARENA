@@ -36,8 +36,13 @@ services:
       ENV: production
       DATABASE_URL: postgresql+asyncpg://user:${POSTGRES_PASSWORD}@postgres/nse_arena
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      KITE_API_KEY: ${KITE_API_KEY:-}
+      KITE_API_SECRET: ${KITE_API_SECRET:-}
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

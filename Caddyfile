@@ -1,7 +1,20 @@
+{
+	# Trust X-Forwarded-For only from private peers (Tailscale Serve on the
+	# host / the docker bridge in private mode). A public peer's forwarded
+	# IP is overwritten with its real address, so clients cannot spoof the
+	# IP the backend rate-limits on.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
 {$DOMAIN:localhost} {
 	# Backend routes — everything the FastAPI app actually serves. See
 	# backend/main.py and backend/api/routes/*.py for the source of truth.
-	@backend path /auth/* /trades/* /portfolio/* /leaderboard/* /seasons/* /ai/* /api/* /price/* /score/* /ws/* /health /docs /redoc /openapi.json
+	# Both the bare path and its children are listed: Caddy's `/x/*` does NOT
+	# match `/x` itself, and the API serves `/trades`, `/portfolio`,
+	# `/leaderboard`, `/seasons` etc. at the bare path.
+	@backend path /auth/* /trades /trades/* /portfolio /portfolio/* /leaderboard /leaderboard/* /seasons /seasons/* /ai/* /api/* /price/* /score/* /ws/* /tickers /health /docs /redoc /openapi.json
 
 	reverse_proxy @backend backend:8000
 

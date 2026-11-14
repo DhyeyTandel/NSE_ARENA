@@ -8,7 +8,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config import GEMINI_API_KEY
+from config import GROQ_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,10 @@ class AIScheduler:
         self._started = False
 
     async def start(self):
-        """Start the AI agent scheduler if Gemini API key is configured"""
-        if not GEMINI_API_KEY:
+        """Start the AI agent scheduler if Groq API key is configured"""
+        if not GROQ_API_KEY:
             logger.warning(
-                "GEMINI_API_KEY not set — AI agent scheduler disabled. "
+                "GROQ_API_KEY not set — AI agent scheduler disabled. "
                 "Set the key in backend/.env to enable AI trading."
             )
             return

@@ -8,11 +8,12 @@ the agent's own try/except and got swallowed by scheduler.py's broad
 silently (no AIDecision row was even written for that cycle).
 
 This drives AIScheduler._run_ai_cycle() end-to-end -- the exact path
-production uses -- with only Gemini and the yfinance-backed price fetcher
+production uses -- with only Groq and the yfinance-backed price fetcher
 mocked, and asserts a guardrail-approved decision actually lands: cash and
 position move, and an AIDecision row is written.
 """
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -76,16 +77,16 @@ def _open_monday_patch():
     return p
 
 
-def _mock_gemini_response(action: str):
+def _mock_groq_response(action: str):
     class FakeResponse:
-        text = (
+        content = (
             '{"action": "%s", "ticker": "RELIANCE", "quantity": 5, '
             '"stop_loss_price": 900.0, "position_size_pct": 0.05, '
             '"reasoning": "test cycle", "confidence": 0.8}' % action
         )
 
     async def fake_generate(*args, **kwargs):
-        return FakeResponse()
+        return SimpleNamespace(choices=[SimpleNamespace(message=FakeResponse())])
 
     return fake_generate
 
@@ -104,8 +105,8 @@ async def test_approved_buy_decision_executes_a_real_trade(test_db, monkeypatch)
         lambda ticker: {"ticker": ticker, **MOCK_PRICE},
     )
     monkeypatch.setattr(
-        "google.genai.models.AsyncModels.generate_content",
-        _mock_gemini_response("buy"),
+        "groq.resources.chat.completions.AsyncCompletions.create",
+        _mock_groq_response("buy"),
     )
 
     p = _open_monday_patch()
@@ -151,8 +152,8 @@ async def test_hold_decision_writes_no_trade(test_db, monkeypatch):
         lambda ticker: {"ticker": ticker, **MOCK_PRICE},
     )
     monkeypatch.setattr(
-        "google.genai.models.AsyncModels.generate_content",
-        _mock_gemini_response("hold"),
+        "groq.resources.chat.completions.AsyncCompletions.create",
+        _mock_groq_response("hold"),
     )
 
     p = _open_monday_patch()

@@ -1,4 +1,9 @@
 // components/NavBar.jsx
+import { useState, useEffect, useRef } from 'react';
+import { useSeasonStanding } from '../hooks/useSeasonStanding';
+import { ThemeToggle } from './ThemeToggle';
+import './NavBar.css';
+
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'leaderboard', label: 'Leaderboard' },
@@ -7,94 +12,84 @@ const NAV_ITEMS = [
 ];
 
 export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const standing = useSeasonStanding(!!user, user);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const seasonParts = [];
+  if (standing.season) {
+    seasonParts.push(standing.season.name);
+    if (standing.daysLeft != null) {
+      seasonParts.push(`${standing.daysLeft} ${standing.daysLeft === 1 ? 'day' : 'days'} left`);
+    }
+    if (standing.rank != null) {
+      seasonParts.push(`Rank #${standing.rank}${standing.traderCount > 0 ? ` of ${standing.traderCount.toLocaleString('en-IN')}` : ''}`);
+    }
+  } else if (!standing.loading) {
+    seasonParts.push('No active season');
+  }
+
   return (
-    <nav style={{
-      position: 'sticky', top: 0, zIndex: 100,
-      display: 'flex', alignItems: 'center', gap: '32px',
-      padding: '0 32px', height: '60px',
-      background: 'var(--paper-lift)',
-      borderBottom: '1px solid var(--faint)',
-    }}>
-      {/* Logo */}
-      <div
-        onClick={() => onNavigate('dashboard')}
-        style={{ display: 'flex', alignItems: 'baseline', gap: '8px', cursor: 'pointer' }}
-      >
-        <span style={{
-          width: '7px', height: '7px', borderRadius: '999px',
-          background: 'var(--accent)', display: 'inline-block',
-          transform: 'translateY(-1px)',
-        }} />
-        <span style={{
-          fontFamily: '"Newsreader", Georgia, serif',
-          fontSize: '21px', fontWeight: 500, letterSpacing: '-0.02em',
-          color: 'var(--ink)',
-        }}>
-          NSE Arena
-        </span>
-      </div>
+    <nav className="nav" aria-label="Main">
+      <button type="button" className="nav-logo" onClick={() => onNavigate('dashboard')}>
+        <span className="nav-mark" aria-hidden="true">N</span>
+        NSE Arena
+      </button>
 
-      {/* Pill tabs */}
-      <div style={{ display: 'flex', gap: '4px', fontSize: '14.5px', fontWeight: 560 }}>
-        {NAV_ITEMS.map(item => {
-          const isActive = activeScreen === item.key;
-          return (
-            <button
-              key={item.key}
-              onClick={() => onNavigate(item.key)}
-              style={{
-                padding: '6px 14px', borderRadius: '999px',
-                border: 'none', cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit',
-                background: isActive ? 'var(--ink)' : 'transparent',
-                color: isActive ? 'var(--paper)' : 'var(--muted)',
-                transition: 'all var(--dur-fast) var(--ease-swift)',
-              }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = 'var(--ink)'; }}
-              onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = 'var(--muted)'; }}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Right side */}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {onLogout && (
+      <div className="nav-links">
+        {NAV_ITEMS.map(item => (
           <button
-            onClick={onLogout}
-            style={{
-              padding: '5px 14px', fontSize: '12px', fontWeight: 500,
-              color: 'var(--muted)', background: 'transparent',
-              border: '1px solid var(--faint)', borderRadius: '999px',
-              cursor: 'pointer', fontFamily: 'inherit',
-              transition: 'all var(--dur-fast) var(--ease-swift)',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--error)';
-              e.currentTarget.style.borderColor = 'var(--error-glow)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--muted)';
-              e.currentTarget.style.borderColor = 'var(--faint)';
-            }}
+            key={item.key} type="button"
+            className={`nav-link${activeScreen === item.key ? ' is-active' : ''}`}
+            aria-current={activeScreen === item.key ? 'page' : undefined}
+            onClick={() => onNavigate(item.key)}
           >
-            Sign out
+            {item.label}
           </button>
+        ))}
+      </div>
+
+      <div className="nav-right">
+        {seasonParts.length > 0 && (
+          <div className="nav-season" data-testid="season-line">{seasonParts.join(' · ')}</div>
         )}
-        <div
-          onClick={() => onNavigate('profile')}
-          style={{
-            width: '32px', height: '32px', borderRadius: '999px',
-            background: activeScreen === 'profile' ? 'var(--ink)' : 'var(--accent-soft)',
-            color: activeScreen === 'profile' ? 'var(--paper)' : 'var(--accent-deep)',
-            display: 'grid', placeItems: 'center',
-            fontWeight: 600, fontSize: '13px', cursor: 'pointer',
-            transition: 'all var(--dur-fast) var(--ease-swift)',
-          }}
-        >
-          {user?.initials || '??'}
+        <div className="nav-tools">
+          <ThemeToggle />
+          <div className="nav-user" ref={menuRef}>
+            <button
+              type="button"
+              className={`nav-avatar${activeScreen === 'profile' ? ' is-active' : ''}`}
+              aria-label="Account menu" aria-haspopup="menu" aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(o => !o)}
+            >
+              {user?.initials || '??'}
+            </button>
+            {menuOpen && (
+              <div className="nav-menu" role="menu">
+                <div className="nav-menu-name">{user?.username}</div>
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onNavigate('profile'); }}>
+                  Profile
+                </button>
+                {onLogout && (
+                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onLogout(); }}>
+                    Sign out
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

@@ -1,5 +1,6 @@
 // screens/AuthScreen.jsx
 import { useState } from 'react';
+import { ThemeToggle } from '../components/ThemeToggle';
 import './AuthScreen.css';
 
 export function AuthScreen({ onAuth, error, clearError }) {
@@ -17,19 +18,23 @@ export function AuthScreen({ onAuth, error, clearError }) {
   };
 
   const validate = () => {
-    if (username.length < 3) {
-      setValidationError('Username must be at least 3 characters');
-      return false;
-    }
-    if (password.length < 6) {
-      setValidationError('Password must be at least 6 characters');
-      return false;
-    }
     if (mode === 'register') {
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!/^[A-Za-z0-9_-]{3,30}$/.test(username)) {
+        setValidationError('Username must be 3-30 characters: letters, numbers, _ or -');
+        return false;
+      }
+      if (!email || email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         setValidationError('Please enter a valid email address');
         return false;
       }
+      if (password.length < 8 || password.length > 128) {
+        setValidationError('Password must be 8-128 characters');
+        return false;
+      }
+    } else if (!username || !password) {
+      // Login: no length rules, accounts predate the registration limits.
+      setValidationError('Enter your username and password');
+      return false;
     }
     setValidationError('');
     return true;
@@ -55,39 +60,29 @@ export function AuthScreen({ onAuth, error, clearError }) {
 
   return (
     <div className="auth-container">
+      <div className="auth-theme"><ThemeToggle /></div>
       <div className="auth-card">
-        {/* Logo */}
         <div className="auth-logo">
-          <div className="auth-logo-icon">N</div>
-          <div className="auth-logo-text t-display">
-            NSE <em>Arena</em>
-          </div>
+          <span className="nav-mark" aria-hidden="true">N</span>
+          NSE Arena
         </div>
         <div className="auth-subtitle">
           Master the markets. Zero real risk.
         </div>
 
-        {/* Tabs */}
-        <div className="auth-tabs">
-          <button
-            className={`auth-tab ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => switchMode('login')}
-            type="button"
-          >
-            Sign In
+        <div className="seg seg--block" role="tablist">
+          <button type="button" role="tab" aria-selected={mode === 'login'}
+            className={mode === 'login' ? 'is-active' : ''} onClick={() => switchMode('login')}>
+            Sign in
           </button>
-          <button
-            className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => switchMode('register')}
-            type="button"
-          >
-            Create Account
+          <button type="button" role="tab" aria-selected={mode === 'register'}
+            className={mode === 'register' ? 'is-active' : ''} onClick={() => switchMode('register')}>
+            Create account
           </button>
         </div>
 
-        {/* Error */}
         {displayError && (
-          <div className="auth-error">⚠ {displayError}</div>
+          <div className="auth-error" role="alert">{displayError}</div>
         )}
 
         {/* Form */}
@@ -95,11 +90,14 @@ export function AuthScreen({ onAuth, error, clearError }) {
           <div className="auth-field">
             <label htmlFor="auth-username">Username</label>
             <input
+              className="input"
               id="auth-username"
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
               placeholder="your_trader_name"
+              minLength={mode === 'register' ? 3 : undefined}
+              maxLength={mode === 'register' ? 30 : undefined}
               autoComplete="username"
               autoFocus
             />
@@ -109,11 +107,13 @@ export function AuthScreen({ onAuth, error, clearError }) {
             <div className="auth-field">
               <label htmlFor="auth-email">Email</label>
               <input
+              className="input"
                 id="auth-email"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                maxLength={100}
                 autoComplete="email"
               />
             </div>
@@ -122,34 +122,29 @@ export function AuthScreen({ onAuth, error, clearError }) {
           <div className="auth-field">
             <label htmlFor="auth-password">Password</label>
             <input
+              className="input"
               id="auth-password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={mode === 'register' ? 'At least 8 characters' : '••••••••'}
+              minLength={mode === 'register' ? 8 : undefined}
+              maxLength={mode === 'register' ? 128 : undefined}
               autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
             />
           </div>
 
           <button
             type="submit"
-            className={`auth-submit ${submitting ? 'loading' : ''}`}
+            className={`btn btn--block auth-submit ${submitting ? 'loading' : ''}`}
             disabled={submitting}
           >
-            {mode === 'login' ? 'Sign In' : 'Create Account'}
+            {mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
         </form>
 
-        {/* Feature chips footer */}
         <div className="auth-footer">
-          <div className="auth-features">
-            <span className="auth-feature-chip">
-              <span className="mono">₹1,00,000</span> virtual capital
-            </span>
-            <span className="auth-feature-chip">◆ Live NSE data</span>
-            <span className="auth-feature-chip">◆ AI competitors</span>
-            <span className="auth-feature-chip">◆ Seasonal leagues</span>
-          </div>
+          ₹1,00,000 virtual capital · Live NSE data · AI competitors · Seasonal leagues
         </div>
       </div>
     </div>

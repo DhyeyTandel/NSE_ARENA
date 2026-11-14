@@ -3,8 +3,9 @@
  * Monaco Editor wrapper with custom PineScript-lite language support.
  * Provides syntax highlighting, auto-completion, and a theme matching the app.
  */
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
+import { cssVar, getTheme, useThemeName } from '../theme';
 
 // ── PineScript-lite language definition (Monarch tokenizer) ────────────────
 
@@ -236,73 +237,89 @@ function registerPineScript(monaco) {
       return null;
     },
   });
+  definePineTheme(monaco);
+}
 
-  // ── Theme ────────────────────────────────────────────────────────────
-
-  monaco.editor.defineTheme('pine', {
-    base: 'vs',
+// Theme colours come from the CSS tokens of the active theme, so light and
+// dark stay in sync with the rest of the app.
+function definePineTheme(monaco) {
+  const dark = getTheme() === 'dark';
+  const hex = name => cssVar(name);
+  const fg = name => cssVar(name).replace('#', '');
+  monaco.editor.defineTheme(dark ? 'pine-dark' : 'pine-light', {
+    base: dark ? 'vs-dark' : 'vs',
     inherit: true,
     rules: [
-      { token: 'comment', foreground: '8A8072', fontStyle: 'italic' },
-      { token: 'comment.directive', foreground: '8A8072', fontStyle: 'italic' },
-      { token: 'keyword', foreground: 'C24303' },
-      { token: 'number', foreground: '1E8A5A' },
-      { token: 'number.float', foreground: '1E8A5A' },
-      { token: 'string', foreground: 'B82E80' },
-      { token: 'variable.predefined', foreground: '5B4DF2' },
-      { token: 'support.function', foreground: '4438D6' },
-      { token: 'constant.color', foreground: 'DE3D9E' },
-      { token: 'constant.style', foreground: 'DE3D9E' },
-      { token: 'operator', foreground: '7C7367' },
-      { token: 'delimiter', foreground: 'A89E90' },
-      { token: 'identifier', foreground: '17140F' },
+      { token: 'comment', foreground: fg('--code-comment'), fontStyle: 'italic' },
+      { token: 'comment.directive', foreground: fg('--code-comment'), fontStyle: 'italic' },
+      { token: 'keyword', foreground: fg('--code-keyword') },
+      { token: 'number', foreground: fg('--code-number') },
+      { token: 'number.float', foreground: fg('--code-number') },
+      { token: 'string', foreground: fg('--code-string') },
+      { token: 'variable.predefined', foreground: fg('--code-const') },
+      { token: 'support.function', foreground: fg('--code-fn') },
+      { token: 'constant.color', foreground: fg('--code-const') },
+      { token: 'constant.style', foreground: fg('--code-const') },
+      { token: 'operator', foreground: fg('--chart-axis') },
+      { token: 'delimiter', foreground: fg('--chart-axis') },
+      { token: 'identifier', foreground: fg('--text') },
     ],
     colors: {
-      'editor.background': '#FFFFFF',
-      'editor.foreground': '#17140F',
-      'editor.lineHighlightBackground': '#FCFAF6',
-      'editor.selectionBackground': '#EE530825',
-      'editor.inactiveSelectionBackground': '#EE530812',
-      'editorCursor.foreground': '#EE5308',
-      'editorIndentGuide.background': '#17140F0D',
-      'editorIndentGuide.activeBackground': '#17140F1F',
-      'editorLineNumber.foreground': '#C9C0B2',
-      'editorLineNumber.activeForeground': '#4B443A',
-      'editorWidget.background': '#FFFFFF',
-      'editorWidget.border': '#E6DFD2',
-      'editorSuggestWidget.background': '#FFFFFF',
-      'editorSuggestWidget.border': '#E6DFD2',
-      'editorSuggestWidget.selectedBackground': '#FBE6D9',
-      'list.hoverBackground': '#FCFAF6',
+      'editor.background': hex('--bg'),
+      'editor.foreground': hex('--text'),
+      'editor.lineHighlightBackground': hex('--canvas'),
+      'editor.selectionBackground': hex('--selected'),
+      'editor.inactiveSelectionBackground': hex('--hover'),
+      'editorCursor.foreground': hex('--accent'),
+      'editorIndentGuide.background1': hex('--border'),
+      'editorLineNumber.foreground': hex('--chart-axis'),
+      'editorLineNumber.activeForeground': hex('--text'),
+      'editorWidget.background': hex('--bg'),
+      'editorWidget.border': hex('--border'),
+      'editorSuggestWidget.background': hex('--bg'),
+      'editorSuggestWidget.border': hex('--border'),
+      'editorSuggestWidget.selectedBackground': hex('--selected'),
+      'list.hoverBackground': hex('--hover'),
     },
   });
 }
-
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function MonacoEditor({ value, onChange, height = '100%' }) {
   const editorRef = useRef(null);
+  const monacoRef = useRef(null);
+  const theme = useThemeName();
+  const themeId = `pine-${theme}`;
 
   const handleMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     registerPineScript(monaco);
-    monaco.editor.setTheme('pine');
+    monaco.editor.setTheme(`pine-${getTheme()}`);
   }, []);
+
+  // Re-define from the new tokens and switch live when the theme is toggled.
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco) return;
+    definePineTheme(monaco);
+    monaco.editor.setTheme(themeId);
+  }, [themeId]);
 
   return (
     <Editor
       height={height}
       language={PINE_LANG_ID}
-      theme="pine"
+      theme={themeId}
       value={value}
       onChange={onChange}
       beforeMount={registerPineScript}
       onMount={handleMount}
       options={{
         fontSize: 13,
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-        fontLigatures: true,
+        fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+        fontLigatures: false,
         lineNumbers: 'on',
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
@@ -311,9 +328,8 @@ export function MonacoEditor({ value, onChange, height = '100%' }) {
         wordWrap: 'on',
         padding: { top: 12, bottom: 12 },
         renderLineHighlight: 'line',
-        cursorBlinking: 'smooth',
-        cursorSmoothCaretAnimation: 'on',
-        smoothScrolling: true,
+        cursorBlinking: 'solid',
+        smoothScrolling: false,
         suggest: {
           showKeywords: true,
           showFunctions: true,

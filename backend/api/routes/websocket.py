@@ -6,6 +6,8 @@ import json
 import logging
 
 from api.dependencies import AUTH_COOKIE_NAME
+from api.rate_limit import client_ip
+from api.token_revocation import is_revoked
 from config import SECRET_KEY, ALGORITHM
 
 logger = logging.getLogger(__name__)
@@ -22,19 +24,14 @@ AUTH_TIMEOUT_SECONDS = 5.0
 _ip_connection_counts: dict[str, int] = {}
 
 
-def _client_ip(websocket: WebSocket) -> str:
-    forwarded = websocket.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return websocket.client.host if websocket.client else "unknown"
-
-
-def _valid_token(token: str) -> bool:
+async def _valid_token(token: str, app) -> bool:
     try:
         claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return bool(claims.get("sub"))
     except JWTError:
         return False
+    if not claims.get("sub"):
+        return False
+    return not await is_revoked(app, claims)
 
 
 async def _authenticate(websocket: WebSocket) -> bool:
@@ -44,13 +41,13 @@ async def _authenticate(websocket: WebSocket) -> bool:
     access logs). Closes with 4401 on timeout, malformed payload, or an
     invalid/expired token."""
     cookie_token = websocket.cookies.get(AUTH_COOKIE_NAME)
-    if cookie_token and _valid_token(cookie_token):
+    if cookie_token and await _valid_token(cookie_token, websocket.app):
         return True
 
     try:
         raw = await asyncio.wait_for(websocket.receive_text(), timeout=AUTH_TIMEOUT_SECONDS)
         payload = json.loads(raw)
-        return _valid_token(payload.get("token", ""))
+        return await _valid_token(payload.get("token", ""), websocket.app)
     except (asyncio.TimeoutError, ValueError, json.JSONDecodeError, WebSocketDisconnect):
         return False
 
@@ -69,8 +66,8 @@ async def websocket_prices(websocket: WebSocket):
         await websocket.close(code=4429, reason="Too many connections")
         return
 
-    client_ip = _client_ip(websocket)
-    if _ip_connection_counts.get(client_ip, 0) >= MAX_CONNECTIONS_PER_IP:
+    ip = client_ip(websocket)
+    if _ip_connection_counts.get(ip, 0) >= MAX_CONNECTIONS_PER_IP:
         await websocket.close(code=4429, reason="Too many connections from this IP")
         return
 
@@ -79,7 +76,7 @@ async def websocket_prices(websocket: WebSocket):
         return
 
     connected_clients.append(websocket)
-    _ip_connection_counts[client_ip] = _ip_connection_counts.get(client_ip, 0) + 1
+    _ip_connection_counts[ip] = _ip_connection_counts.get(ip, 0) + 1
     logger.info("WebSocket client connected. Total clients: %d", len(connected_clients))
 
     broadcaster = websocket.app.state.broadcaster
@@ -103,11 +100,11 @@ async def websocket_prices(websocket: WebSocket):
     finally:
         if websocket in connected_clients:
             connected_clients.remove(websocket)
-        remaining = _ip_connection_counts.get(client_ip, 1) - 1
+        remaining = _ip_connection_counts.get(ip, 1) - 1
         if remaining <= 0:
-            _ip_connection_counts.pop(client_ip, None)
+            _ip_connection_counts.pop(ip, None)
         else:
-            _ip_connection_counts[client_ip] = remaining
+            _ip_connection_counts[ip] = remaining
         logger.info("WebSocket cleanup done. Remaining clients: %d", len(connected_clients))
 
 

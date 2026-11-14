@@ -2,6 +2,7 @@
 """Unit tests for config.py — verify defaults and constants."""
 
 import importlib
+import os
 
 import pytest
 
@@ -12,7 +13,8 @@ def test_default_values_exist():
     """All expected config constants should be defined."""
     assert hasattr(config, "DATABASE_URL")
     assert hasattr(config, "REDIS_URL")
-    assert hasattr(config, "GEMINI_API_KEY")
+    assert hasattr(config, "GROQ_API_KEY")
+    assert hasattr(config, "GROQ_MODEL")
     assert hasattr(config, "SECRET_KEY")
     assert hasattr(config, "ALGORITHM")
     assert hasattr(config, "ACCESS_TOKEN_EXPIRE_MINUTES")
@@ -57,3 +59,44 @@ def test_production_sqlite_refuses_to_boot(monkeypatch):
         monkeypatch.setenv("ENV", "development")
         monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///./nse_arena.db")
         importlib.reload(config)
+
+
+def _reload_in_production(monkeypatch, secret):
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://u:p@db/x")
+    monkeypatch.setenv("SECRET_KEY", secret)
+    importlib.reload(config)
+
+
+@pytest.fixture
+def restore_config(monkeypatch):
+    original_key = os.environ["SECRET_KEY"]
+    yield
+    monkeypatch.setenv("ENV", "development")
+    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///./nse_arena.db")
+    monkeypatch.setenv("SECRET_KEY", original_key)
+    importlib.reload(config)
+
+
+@pytest.mark.parametrize("secret", [
+    "short-but-random-9x",                                   # < 32 chars
+    "Change-This-To-A-Random-Secret-Key-In-Production",       # example file value, mixed case
+    "change-this-" + "x" * 40,
+    "YOUR-SECRET-" + "x" * 40,
+    "changeme" + "x" * 40,
+])
+def test_production_rejects_weak_or_placeholder_secret(monkeypatch, restore_config, secret):
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        _reload_in_production(monkeypatch, secret)
+
+
+def test_production_accepts_strong_secret(monkeypatch, restore_config):
+    _reload_in_production(monkeypatch, "a1b2c3d4" * 8)
+    assert config.SECRET_KEY == "a1b2c3d4" * 8
+
+
+def test_development_stays_lenient_about_short_secret(monkeypatch, restore_config):
+    monkeypatch.setenv("ENV", "development")
+    monkeypatch.setenv("SECRET_KEY", "short")
+    importlib.reload(config)
+    assert config.SECRET_KEY == "short"

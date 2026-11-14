@@ -43,9 +43,53 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(payload)
 
 
+KITE_CALLBACK_PREFIX = "/api/kite/callback"
+_UVICORN_ACCESS_ARGS_LEN = 5  # (client_addr, method, full_path, http_version, status_code)
+
+
+class KiteCallbackQueryRedactionFilter(logging.Filter):
+    """Redact the query string of Kite login callback requests in the
+    uvicorn access log.
+
+    The callback URL carries a one-time request_token and a state value;
+    uvicorn logs the full request line, so without this filter those land
+    in the logs. Only the query string is replaced; the line is still kept.
+    This filter must never raise: any record with an unexpected shape is
+    passed through unchanged.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            args = record.args
+            if not isinstance(args, tuple) or len(args) != _UVICORN_ACCESS_ARGS_LEN:
+                return True
+            full_path = args[2]
+            if not isinstance(full_path, str):
+                return True
+            path, sep, _query = full_path.partition("?")
+            if not sep or not path.startswith(KITE_CALLBACK_PREFIX):
+                return True
+            record.args = (*args[:2], f"{path}?[redacted]", *args[3:])
+        except Exception:
+            return True
+        return True
+
+
+def install_access_log_redaction() -> None:
+    """Attach the Kite callback redaction filter to uvicorn's access logger.
+
+    Idempotent. Attaching to the logger object (not a handler) means it
+    survives uvicorn's own dictConfig, which runs before the app is imported.
+    """
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, KiteCallbackQueryRedactionFilter) for f in access_logger.filters):
+        access_logger.addFilter(KiteCallbackQueryRedactionFilter())
+
+
 def configure_logging(level: int = logging.INFO) -> None:
     """Replace the root logger's handlers with one JSON-structured,
-    request-ID-tagged stream handler. Call once at process startup."""
+    request-ID-tagged stream handler. Call once at process startup.
+    Also installs the Kite callback access-log redaction filter."""
     handler = logging.StreamHandler()
     handler.setFormatter(JSONFormatter())
     handler.addFilter(RequestIdFilter())
@@ -53,3 +97,5 @@ def configure_logging(level: int = logging.INFO) -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level)
+
+    install_access_log_redaction()

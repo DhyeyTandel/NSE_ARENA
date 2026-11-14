@@ -1,0 +1,20 @@
+# docker-compose.tailnet.yml — override for a private deploy behind
+# Tailscale Serve (or any tunnel that terminates HTTPS itself).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tailnet.yml \
+#     --env-file .env.deploy up -d --build
+#   tailscale serve --bg --https=8443 http://127.0.0.1:8096
+#
+# Differences from the base file:
+# - Caddy binds to loopback only (127.0.0.1:8096) instead of 0.0.0.0:80/443,
+#   so the app is not exposed to the LAN and does not fight other services
+#   for 80/443. The tunnel is the only way in.
+# - DOMAIN=":80" makes Caddy serve plain HTTP on any hostname and skip
+#   certificate management; HTTPS comes from the tunnel. The browser still
+#   sees https://, which the backend's Secure auth cookie requires.
+services:
+  caddy:
+    ports: !override
+      - "127.0.0.1:${TAILNET_HOST_PORT:-8096}:80"
+    environment:
+      DOMAIN: ":80"

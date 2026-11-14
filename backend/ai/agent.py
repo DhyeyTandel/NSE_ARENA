@@ -1,16 +1,14 @@
 # ai/agent.py
 import asyncio
 import json
-from google import genai
-from google.genai import types as genai_types
+from groq import AsyncGroq
 from .risk_memory import AIRiskMemory
 from .guardrails import RiskGuardrail
 from .prompts import SYSTEM_PROMPT, RESPONSE_FORMAT
-from config import GEMINI_API_KEY
+from config import GROQ_API_KEY, GROQ_MODEL
 from services.trading import TradeRejected
 
-GEMINI_CALL_TIMEOUT_SECONDS = 30
-GEMINI_MODEL_NAME = "gemini-1.5-pro"
+GROQ_CALL_TIMEOUT_SECONDS = 30
 
 
 class AIAgent:
@@ -19,13 +17,11 @@ class AIAgent:
         self.order_engine = order_engine
         self.memory = risk_memory if risk_memory is not None else AIRiskMemory()
         self.guardrail = RiskGuardrail()
-        # google.genai.Client validates eagerly and raises on an empty key,
-        # unlike the old google.generativeai SDK's lenient configure() — a
-        # placeholder keeps construction (and tests that monkeypatch
-        # self.client.aio.models afterward) working without a real key in
-        # dev/test; a real call still fails cleanly against Google's API if
-        # GEMINI_API_KEY was genuinely never set in production.
-        self.client = genai.Client(api_key=GEMINI_API_KEY or "unset-gemini-api-key")
+        # AsyncGroq raises on a missing key, so a placeholder keeps
+        # construction (and tests that patch self.client afterward) working
+        # without a real key in dev/test; a real call still fails cleanly
+        # against Groq's API if GROQ_API_KEY was genuinely never set.
+        self.client = AsyncGroq(api_key=GROQ_API_KEY or "unset-groq-api-key")
 
     async def run_cycle(self, market_data: dict):
         """Called every 30 minutes during market hours"""
@@ -33,21 +29,21 @@ class AIAgent:
 
         try:
             response = await asyncio.wait_for(
-                self.client.aio.models.generate_content(
-                    model=GEMINI_MODEL_NAME,
-                    contents=prompt,
-                    config=genai_types.GenerateContentConfig(
-                        temperature=0.3,  # lower = more consistent, less creative
-                        response_mime_type="application/json",
-                    ),
+                self.client.chat.completions.create(
+                    model=GROQ_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3,  # lower = more consistent, less creative
+                    response_format={"type": "json_object"},
                 ),
-                timeout=GEMINI_CALL_TIMEOUT_SECONDS,
+                timeout=GROQ_CALL_TIMEOUT_SECONDS,
             )
-            decision = json.loads(response.text)
+            decision = json.loads(response.choices[0].message.content)
+            if not isinstance(decision, dict):
+                raise ValueError("model returned non-object JSON")
         except asyncio.TimeoutError:
             return {
                 "action": "hold",
-                "reason": f"Gemini call timed out after {GEMINI_CALL_TIMEOUT_SECONDS}s",
+                "reason": f"Groq call timed out after {GROQ_CALL_TIMEOUT_SECONDS}s",
             }
         except Exception as e:
             return {"action": "hold", "reason": f"Parse error: {e}"}

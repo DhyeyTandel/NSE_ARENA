@@ -154,7 +154,7 @@ async def test_bearer_header_skips_csrf_requirement(client):
 @pytest.mark.asyncio
 async def test_logout_clears_cookie(client):
     await _register(client)
-    resp = await client.post("/auth/logout")
+    resp = await client.post("/auth/logout", headers={"X-Requested-With": "XMLHttpRequest"})
     assert resp.status_code == 200
     # After logout the cookie jar no longer authenticates us.
     resp = await client.get("/auth/me")
@@ -176,3 +176,14 @@ def test_websocket_accepts_auth_cookie():
         # No first-frame token sent — the cookie authenticated the
         # handshake, so the connection stays open (no 4401 close frame).
         assert len(ws_module.connected_clients) == 1
+
+
+@pytest.mark.asyncio
+async def test_register_rejects_case_variant_username_and_me_has_is_admin(client):
+    first = await client.post("/auth/register", json={
+        "username": "CaseUser", "email": "c1@nse-arena.com", "password": "password123"})
+    assert first.status_code == 200 and first.json()["user"]["is_admin"] is False
+    dup = await client.post("/auth/register", json={
+        "username": "caseuser", "email": "c2@nse-arena.com", "password": "password123"})
+    assert dup.status_code == 400
+    assert (await client.get("/auth/me")).json()["is_admin"] is False

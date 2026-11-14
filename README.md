@@ -26,7 +26,7 @@ Practice trading NSE stocks risk-free. Compete on seasonal leaderboards. Write c
 | **TradingView Charts** | Full TradingView Advanced Chart widget embedded for professional-grade charting |
 | **PineScript Editor** | Write and run PineScript-lite scripts — a custom scripting engine that supports SMA, EMA, RSI, MACD, Bollinger Bands, and more |
 | **Indicator Overlay** | Script outputs are rendered on a lightweight-charts instance with multi-pane support |
-| **AI Agents** | Background Gemini-powered AI agents that autonomously analyze and trade |
+| **AI Agents** | Background Groq-powered AI agents that autonomously analyze and trade |
 | **Seasonal Competitions** | Time-boxed seasons (default 30 days) with separate leaderboards |
 | **Trader Scoring** | Multi-factor scoring: returns, risk management, consistency, discipline |
 | **Leaderboard** | Ranked standings with live PnL tracking |
@@ -56,7 +56,7 @@ Practice trading NSE stocks risk-free. Compete on seasonal leaderboards. Write c
 │  └──┬──┘ └──┬───┘ └────┬────┘ └──────┬───────┘  │
 │     │       │          │             │           │
 │  ┌──┴───────┴──┐  ┌────┴────┐  ┌────┴────────┐  │
-│  │ PostgreSQL  │  │  Redis  │  │  Gemini AI  │  │
+│  │ PostgreSQL  │  │  Redis  │  │  Groq AI    │  │
 │  │  (SQLAlchemy│  │ (cache+ │  │  (agents)   │  │
 │  │   async)    │  │  pubsub)│  │             │  │
 │  └─────────────┘  └─────────┘  └─────────────┘  │
@@ -95,7 +95,7 @@ NSE_ARENA/
 │   │                           #   into the live trade path, see engine/matching.py
 │   ├── scoring/                # Trader scoring algorithm
 │   ├── scripting/              # PineScript-lite parser & indicators
-│   ├── ai/                     # Gemini-based AI trading agents
+│   ├── ai/                     # Groq-based AI trading agents
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -168,7 +168,7 @@ pip install -r requirements.txt
 # Configure environment — SECRET_KEY is required, the app refuses to boot
 # without it. Everything else has a working default for local dev.
 cp .env.example .env
-# Edit .env: set SECRET_KEY at minimum, plus your Gemini API key, DB URL, etc.
+# Edit .env: set SECRET_KEY at minimum, plus your Groq API key, DB URL, etc.
 
 # Run the server
 uvicorn main:app --reload --port 8000
@@ -224,7 +224,7 @@ testing when `DOMAIN` is unset or `localhost`).
 | `POSTGRES_PASSWORD` | Yes | Postgres password for the `user` account |
 | `REDIS_PASSWORD` | Yes | Redis `requirepass` — also needed since other containers share the Docker network |
 | `SECRET_KEY` | Yes | JWT signing secret |
-| `GEMINI_API_KEY` | No | AI trading agent is disabled without it |
+| `GROQ_API_KEY` | No | AI trading agent is disabled without it |
 | `DOMAIN` | No | Domain for Caddy's automatic HTTPS; defaults to `localhost` |
 
 ---
@@ -288,7 +288,7 @@ sellSignal = ta.crossunder(fast, slow)
 | **Database** | PostgreSQL 15 (prod) / SQLite (local dev) |
 | **Cache and Pub/Sub** | Redis 7 |
 | **Market Data** | yfinance |
-| **AI** | Google Gemini (generativeai SDK) |
+| **AI** | Groq (`groq` SDK, `openai/gpt-oss-120b` default) |
 | **Auth** | JWT (python-jose) + bcrypt (passlib) |
 | **Containerization** | Docker + Docker Compose |
 | **Testing** | pytest + pytest-asyncio (backend), Vitest + Testing Library (frontend) |
@@ -325,7 +325,8 @@ See [`backend/.env.example`](backend/.env.example) for the full list with commen
 | `DATABASE_URL` | `sqlite+aiosqlite:///./nse_arena.db` | Async DB connection string |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
 | `SECRET_KEY` | *(none — required)* | JWT signing secret; the app refuses to boot without it |
-| `GEMINI_API_KEY` | *(empty)* | Google Gemini API key for AI agents |
+| `GROQ_API_KEY` | *(empty)* | Groq API key for AI agents |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq chat model the AI agent uses (must support JSON mode) |
 
 ---
 

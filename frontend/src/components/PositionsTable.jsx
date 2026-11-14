@@ -26,102 +26,71 @@ export function PositionsTable({ positions, livePrices = {} }) {
 
   if (!positions || positions.length === 0) {
     return (
-      <div style={{
-        padding: '32px 24px', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: '10px',
-      }}>
-        <div style={{ fontSize: '18px', color: 'var(--muted)' }}>▢</div>
-        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--body-color)' }}>No open positions</div>
-        <div style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center' }}>
-          Place your first trade using the order panel above
+      <div>
+        <div className="panel-head"><h3 className="panel-title">Open positions</h3></div>
+        <div className="empty">
+          <strong>No open positions</strong>
+          Place your first trade using the order panel
         </div>
       </div>
     );
   }
 
   const invested = positions.reduce((s, p) => s + p.avg_price * p.quantity, 0);
+  const money = n => '₹' + n?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div>
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'baseline', gap: '12px',
-        padding: '16px 22px', borderBottom: '1px solid var(--faint)',
-      }}>
-        <div className="t-title" style={{ fontSize: '19px' }}>Open positions</div>
-        <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
+      <div className="panel-head">
+        <h3 className="panel-title">Open positions</h3>
+        <span className="panel-sub">
           {positions.length} holdings · ₹{Math.round(invested).toLocaleString('en-IN')} invested
-        </div>
+        </span>
       </div>
-
-      {/* Column headers */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr 1fr',
-        padding: '10px 22px', borderBottom: '1px solid var(--faint-soft)',
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: '10.5px', fontWeight: 600, letterSpacing: '.12em',
-        textTransform: 'uppercase', color: 'var(--muted-soft)',
-      }}>
-        <div>Instrument</div>
-        <div style={{ textAlign: 'right' }}>Qty</div>
-        <div style={{ textAlign: 'right' }}>Avg price</div>
-        <div style={{ textAlign: 'right' }}>LTP</div>
-        <div style={{ textAlign: 'right' }}>P&L</div>
-        <div style={{ textAlign: 'right' }}>Change</div>
+      <div className="table-wrap">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Instrument</th>
+              <th className="r">Qty</th>
+              <th className="r">Avg price</th>
+              <th className="r">LTP</th>
+              <th className="r">P&L</th>
+              <th className="r">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            {positions.map((pos, i) => {
+              const liveData = livePrices[pos.ticker];
+              const currentPrice = liveData?.price || pos.current_price;
+              const pnl = (currentPrice - pos.avg_price) * pos.quantity;
+              const pnlPct = pos.avg_price > 0 ? ((currentPrice - pos.avg_price) / pos.avg_price * 100) : 0;
+              const cls = pnl >= 0 ? 'up' : 'dn';
+              const flash = flashTickers[pos.ticker];
+              return (
+                <tr key={i} style={{
+                  background: flash === 'up' ? 'var(--gain-bg)' : flash === 'down' ? 'var(--loss-bg)' : undefined,
+                  transition: 'background 0.3s',
+                }}>
+                  <td>
+                    <span style={{ fontWeight: 500 }}>{pos.ticker}</span>{' '}
+                    <span className={`chip${pos.state === 'pending' ? ' chip--sell' : ''}`}>
+                      {pos.state === 'pending' ? 'T+1' : pos.state}
+                    </span>
+                  </td>
+                  <td className="r">{pos.quantity}</td>
+                  <td className="r">{money(pos.avg_price)}</td>
+                  <td className="r">{money(currentPrice)}</td>
+                  <td className={`r ${cls}`} style={{ fontWeight: 500 }}>
+                    {pnl >= 0 ? '+' : '−'}₹{Math.abs(Math.round(pnl)).toLocaleString('en-IN')}
+                  </td>
+                  <td className={`r ${cls}`}>{pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-
-      {/* Rows */}
-      {positions.map((pos, i) => {
-        const liveData = livePrices[pos.ticker];
-        const currentPrice = liveData?.price || pos.current_price;
-        const pnl = (currentPrice - pos.avg_price) * pos.quantity;
-        const pnlPct = pos.avg_price > 0 ? ((currentPrice - pos.avg_price) / pos.avg_price * 100) : 0;
-        const isUp = pnl >= 0;
-        const flash = flashTickers[pos.ticker];
-
-        return (
-          <div key={i} style={{
-            display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr 1fr',
-            padding: '13px 22px', borderBottom: '1px solid var(--faint-soft)',
-            fontSize: '14px', alignItems: 'baseline',
-            background: flash === 'up' ? 'var(--success-soft)' : flash === 'down' ? 'var(--error-soft)' : 'transparent',
-            transition: 'background var(--dur) var(--ease-swift)',
-            cursor: 'default',
-          }}
-            onMouseEnter={e => { if (!flash) e.currentTarget.style.background = 'var(--paper-lift)'; }}
-            onMouseLeave={e => { if (!flash) e.currentTarget.style.background = 'transparent'; }}
-          >
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-              <span style={{ fontWeight: 600 }}>{pos.ticker}</span>
-              <span style={{
-                fontSize: '11.5px', padding: '1px 8px', borderRadius: '999px',
-                fontWeight: 560,
-                background: pos.state === 'pending' ? 'var(--accent-soft)' : 'var(--faint-soft)',
-                color: pos.state === 'pending' ? 'var(--accent-deep)' : 'var(--muted)',
-              }}>{pos.state === 'pending' ? 'T+1' : pos.state}</span>
-            </div>
-            <div style={{ textAlign: 'right', fontFamily: '"JetBrains Mono", monospace' }}>{pos.quantity}</div>
-            <div style={{ textAlign: 'right', fontFamily: '"JetBrains Mono", monospace' }}>
-              ₹{pos.avg_price?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <div style={{ textAlign: 'right', fontFamily: '"JetBrains Mono", monospace' }}>
-              ₹{currentPrice?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <div style={{
-              textAlign: 'right', fontFamily: '"JetBrains Mono", monospace',
-              fontWeight: 500, color: isUp ? 'var(--success)' : 'var(--error)',
-            }}>
-              {isUp ? '+' : '−'}₹{Math.abs(Math.round(pnl)).toLocaleString('en-IN')}
-            </div>
-            <div style={{
-              textAlign: 'right', fontFamily: '"JetBrains Mono", monospace',
-              color: isUp ? 'var(--success)' : 'var(--error)',
-            }}>
-              {isUp ? '+' : ''}{pnlPct.toFixed(2)}%
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }

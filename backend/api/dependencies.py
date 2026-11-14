@@ -4,7 +4,9 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
+import config
 from config import SECRET_KEY, ALGORITHM
+from api.token_revocation import is_revoked
 
 AUTH_COOKIE_NAME = "access_token"
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -59,6 +61,8 @@ async def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
+    if await is_revoked(request.app, payload):
+        raise credentials_exception
 
     from sqlalchemy import select
     from db.models import User
@@ -90,8 +94,27 @@ async def get_current_user_optional(
             return None
     except JWTError:
         return None
+    if await is_revoked(request.app, payload):
+        return None
 
     from sqlalchemy import select
     from db.models import User
     result = await db.execute(select(User).where(User.id == int(user_id)))
     return result.scalar_one_or_none()
+
+
+def is_admin(user) -> bool:
+    """Env-based admin check. AI users are never admin; usernames compare
+    case-insensitively against config.ADMIN_USERNAMES (read at call time)."""
+    if user is None or getattr(user, "is_ai", False) is True:
+        return False
+    username = getattr(user, "username", None)
+    if not isinstance(username, str):
+        return False
+    return username.strip().lower() in config.ADMIN_USERNAMES
+
+
+async def require_admin(user=Depends(get_current_user)):
+    if not is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    return user

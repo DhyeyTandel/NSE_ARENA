@@ -6,12 +6,20 @@
 import { useEffect, useRef, useState, memo } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import { API_URL as API_BASE } from '../config';
+import { RANGES, INTRADAY, IST_OFFSET_SECONDS } from './chartRange';
+import { chartTheme, candleColors, cssVar, useThemeName } from '../theme';
 
-function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
+function TradingViewChartInner({ symbol = 'RELIANCE', height = 400, range = '1M', onRangeChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
+  const candleRef = useRef(null);
+  const volumeRef = useRef(null);
+  const volumeDataRef = useRef([]);
+  const rafRef = useRef(0);
+  const theme = useThemeName();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hasData, setHasData] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -22,41 +30,21 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
       chartRef.current = null;
     }
 
+    const base = chartTheme();
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height: height,
-      layout: {
-        background: { color: '#FFFFFF' },
-        textColor: '#7C7367',
-        fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: 'rgba(23,20,15,0.04)' },
-        horzLines: { color: 'rgba(23,20,15,0.04)' },
-      },
+      layout: { ...base.layout, fontFamily: cssVar('--font'), fontSize: 11 },
+      grid: base.grid,
       crosshair: {
         mode: 0,
-        vertLine: {
-          color: 'rgba(23,20,15,0.2)',
-          width: 1,
-          style: 2,
-          labelBackgroundColor: '#2B2620',
-        },
-        horzLine: {
-          color: 'rgba(23,20,15,0.2)',
-          width: 1,
-          style: 2,
-          labelBackgroundColor: '#2B2620',
-        },
+        vertLine: { ...base.crosshair.vertLine, width: 1, style: 2 },
+        horzLine: { ...base.crosshair.horzLine, width: 1, style: 2 },
       },
-      rightPriceScale: {
-        borderColor: 'rgba(23,20,15,0.08)',
-        scaleMargins: { top: 0.1, bottom: 0.25 },
-      },
+      rightPriceScale: { ...base.rightPriceScale, scaleMargins: { top: 0.1, bottom: 0.25 } },
       timeScale: {
-        borderColor: 'rgba(23,20,15,0.08)',
-        timeVisible: true,
+        ...base.timeScale,
+        timeVisible: false,
         secondsVisible: false,
         barSpacing: 8,
         rightOffset: 5,
@@ -66,70 +54,24 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
     });
 
     chartRef.current = chart;
+    setHasData(false);
 
     // Candlestick series
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#1E8A5A',
-      downColor: '#D0342C',
-      borderUpColor: '#1E8A5A',
-      borderDownColor: '#D0342C',
-      wickUpColor: 'rgba(30,138,90,0.5)',
-      wickDownColor: 'rgba(208,52,44,0.5)',
-    });
+    const candleSeries = chart.addSeries(CandlestickSeries, candleColors());
+    candleRef.current = candleSeries;
 
     // Volume series
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
+    volumeRef.current = volumeSeries;
 
     chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.82, bottom: 0 },
       drawTicks: false,
       borderVisible: false,
     });
-
-    // Fetch OHLCV data from our backend
-    const ticker = symbol.replace('.NS', '');
-    setLoading(true);
-    setError(null);
-
-    fetch(`${API_BASE}/price/${ticker}`)
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        if (data.ohlcv && data.ohlcv.length > 0) {
-          const candleData = data.ohlcv.map(bar => ({
-            time: bar.date || bar.time,
-            open: bar.open,
-            high: bar.high,
-            low: bar.low,
-            close: bar.close,
-          }));
-
-          const volumeData = data.ohlcv.map(bar => ({
-            time: bar.date || bar.time,
-            value: bar.volume,
-            color: bar.close >= bar.open
-              ? 'rgba(30,138,90,0.25)'
-              : 'rgba(208,52,44,0.25)',
-          }));
-
-          candleSeries.setData(candleData);
-          volumeSeries.setData(volumeData);
-          chart.timeScale().fitContent();
-        } else {
-          setError('No data available');
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to fetch OHLCV:', err);
-        setError('Failed to load chart data');
-        setLoading(false);
-      });
 
     // Resize handler
     const handleResize = () => {
@@ -150,72 +92,141 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400 }) {
     };
   }, [symbol, height]);
 
+  // Fetch OHLCV for the symbol + range and swap the series data in place.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candleSeries = candleRef.current;
+    const volumeSeries = volumeRef.current;
+    if (!chart || !candleSeries || !volumeSeries) return;
+    let cancelled = false;
+    const ticker = symbol.replace('.NS', '');
+    setLoading(true);
+    setError(null);
+
+    fetch(`${API_BASE}/price/${ticker}?range=${range}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        if (data.ohlcv && data.ohlcv.length > 0) {
+          const t = bar => (bar.date || bar.time) + IST_OFFSET_SECONDS;
+          const candleData = data.ohlcv.map(bar => ({
+            time: t(bar),
+            open: bar.open,
+            high: bar.high,
+            low: bar.low,
+            close: bar.close,
+          }));
+
+          const volumeData = data.ohlcv.map(bar => ({
+            time: t(bar),
+            value: bar.volume,
+            up: bar.close >= bar.open,
+            color: bar.close >= bar.open ? cssVar('--chart-vol-up') : cssVar('--chart-vol-down'),
+          }));
+          volumeDataRef.current = volumeData;
+
+          chart.applyOptions({ timeScale: { timeVisible: INTRADAY.has(range), secondsVisible: false } });
+          candleSeries.setData(candleData);
+          volumeSeries.setData(volumeData.map(({ time, value, color }) => ({ time, value, color })));
+          // Fit explicitly once the library has processed the new data; a
+          // synchronous fitContent right after setData can keep the previous
+          // range's bar spacing/offset (daily -> intraday left candles squeezed).
+          const count = candleData.length;
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = requestAnimationFrame(() => {
+            if (cancelled || chartRef.current !== chart || count === 0) return;
+            chart.timeScale().setVisibleLogicalRange({ from: -0.5, to: count - 0.5 });
+          });
+          setHasData(true);
+        } else {
+          setError('No data available');
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('Failed to fetch OHLCV:', err);
+        setError('Failed to load chart data');
+        setLoading(false);
+      });
+
+    return () => { cancelled = true; cancelAnimationFrame(rafRef.current); };
+  }, [symbol, range, height]);
+
+  // Follow the theme live without refetching data.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const base = chartTheme();
+    chart.applyOptions({
+      layout: base.layout, grid: base.grid, crosshair: base.crosshair,
+      rightPriceScale: base.rightPriceScale, timeScale: base.timeScale,
+    });
+    candleRef.current?.applyOptions(candleColors());
+    if (volumeRef.current && volumeDataRef.current.length) {
+      volumeRef.current.setData(volumeDataRef.current.map(({ time, value, up }) => ({
+        time, value, color: up ? cssVar('--chart-vol-up') : cssVar('--chart-vol-down'),
+      })));
+    }
+  }, [theme]);
+
   return (
+    <>
+    <div className="chart-head">
+      <div className="seg" role="group" aria-label="Chart range">
+        {RANGES.map(r => (
+          <button key={r} type="button" aria-pressed={range === r}
+            className={range === r ? 'is-active' : ''}
+            onClick={() => onRangeChange?.(r)}>{r}</button>
+        ))}
+      </div>
+    </div>
     <div style={{ position: 'relative', width: '100%', height: `${height}px` }}>
       <div
         ref={containerRef}
+        aria-busy={loading}
         style={{
           width: '100%',
           height: '100%',
-          borderRadius: 'var(--r-card, 4px)',
           overflow: 'hidden',
+          opacity: loading && hasData ? 0.45 : 1,
+          transition: 'opacity 0.15s',
         }}
       />
 
-      {/* Loading overlay */}
-      {loading && (
+      {loading && !hasData && (
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(244,240,233,0.85)',
-          borderRadius: 'var(--r-card, 4px)',
+          background: 'var(--overlay)',
         }}>
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', fontSize: '13px', color: 'var(--text-2)' }}>
             <div style={{
-              width: '24px', height: '24px',
-              border: '2px solid rgba(23,20,15,0.1)',
-              borderTopColor: '#EE5308',
+              width: '16px', height: '16px',
+              border: '2px solid var(--border)',
+              borderTopColor: 'var(--accent)',
               borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
             }} />
-            <span style={{
-              fontSize: '11px', color: '#7C7367',
-              fontFamily: "'JetBrains Mono', monospace",
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-            }}>
-              Loading {symbol}...
-            </span>
+            Loading {symbol}
           </div>
         </div>
       )}
 
-      {/* Error overlay */}
       {error && !loading && (
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(244,240,233,0.85)',
-          borderRadius: 'var(--r-card, 4px)',
+          background: 'var(--overlay)',
         }}>
-          <span style={{
-            fontSize: '12px', color: '#D0342C',
-            fontFamily: "'JetBrains Mono', monospace",
-          }}>
-            {error}
-          </span>
+          <span style={{ fontSize: '13px', color: 'var(--loss-text)' }}>{error}</span>
         </div>
       )}
-
-      {/* Spinner keyframes */}
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
+    </>
   );
 }
 

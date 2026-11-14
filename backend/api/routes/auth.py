@@ -2,16 +2,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from jose import jwt
+from sqlalchemy import select, func
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import uuid
 from typing import Optional
 
 from database import get_db
 from db.models import User, Portfolio, Season
-from api.dependencies import get_current_user, AUTH_COOKIE_NAME
+from api.dependencies import get_current_user, is_admin, AUTH_COOKIE_NAME, oauth2_scheme, _extract_token
+from api.token_revocation import revoke
 from api.rate_limit import check_rate_limit, client_ip
 import config
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, STARTING_CAPITAL
@@ -34,10 +36,22 @@ def set_auth_cookie(response: Response, token: str) -> None:
     )
 
 
+# Registration-only constraints. Login deliberately does NOT reuse the
+# username/password rules: existing accounts (and the seeded `ai-agent`)
+# predate them.
+USERNAME_PATTERN = r"^[A-Za-z0-9_-]{3,30}$"
+EMAIL_PATTERN = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+
+# Valid bcrypt hash of a throwaway string, verified when the username does
+# not exist so login takes about as long either way (no user enumeration
+# via timing).
+_DUMMY_HASH = "$2b$12$Ud4C2U.QEYQecXuGu19hyu3DQy4071H7xCUfzl.R2o/rMd7cmMuyK"
+
+
 class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
+    username: str = Field(pattern=USERNAME_PATTERN)
+    email: str = Field(max_length=100, pattern=EMAIL_PATTERN)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class LoginRequest(BaseModel):
@@ -54,8 +68,18 @@ class TokenResponse(BaseModel):
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    # jti lets logout revoke this exact token; iat records issue time.
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc),
+                      "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def _verify_password(password: str, user) -> bool:
+    """Always performs exactly one bcrypt verify, even for unknown users."""
+    if user is None:
+        pwd_context.verify(password, _DUMMY_HASH)
+        return False
+    return pwd_context.verify(password, user.hashed_password)
 
 
 @router.post("/register", response_model=TokenResponse)
@@ -67,8 +91,13 @@ async def register(request: RegisterRequest, http_request: Request, response: Re
     )
 
     # Check if username exists
-    result = await db.execute(select(User).where(User.username == request.username))
-    if result.scalar_one_or_none():
+    # Case-insensitive: the DB unique index is case-sensitive, so "Admin"
+    # and "admin" could otherwise coexist and the former would pass the
+    # case-insensitive admin check.
+    result = await db.execute(
+        select(User).where(func.lower(User.username) == request.username.strip().lower())
+    )
+    if result.scalars().first():
         raise HTTPException(status_code=400, detail="Username already registered")
 
     # Check if email exists
@@ -119,7 +148,7 @@ async def login(http_request: Request,
     result = await db.execute(select(User).where(User.username == form_data.username))
     user = result.scalar_one_or_none()
 
-    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+    if not _verify_password(form_data.password, user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -145,7 +174,7 @@ async def login_json(request: LoginRequest, http_request: Request, response: Res
     result = await db.execute(select(User).where(User.username == request.username))
     user = result.scalar_one_or_none()
 
-    if not user or not pwd_context.verify(request.password, user.hashed_password):
+    if not _verify_password(request.password, user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -158,10 +187,23 @@ async def login_json(request: LoginRequest, http_request: Request, response: Res
 
 
 @router.post("/logout")
-async def logout(response: Response):
-    """Clear the httpOnly auth cookie. No CSRF/auth requirement — logging
-    someone out is not a damaging action and requiring auth would strand
-    clients holding an expired token."""
+async def logout(request: Request, response: Response,
+                 bearer_token: str | None = Depends(oauth2_scheme)):
+    """Clear the httpOnly auth cookie and revoke the presented token.
+
+    Cookie-authenticated calls need X-Requested-With like every other
+    state-changing route (enforced by _extract_token). An absent, expired
+    or invalid token is not an error: the cookie is cleared regardless so
+    clients holding a stale token are not stranded. Revocation is
+    best-effort (fails open if Redis is down)."""
+    token = _extract_token(request, bearer_token)
+    if token:
+        try:
+            claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        except JWTError:
+            claims = None
+        if claims:
+            await revoke(request.app, claims)
     response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
     return {"status": "logged out"}
 
@@ -179,4 +221,5 @@ def _user_to_dict(user: User) -> dict:
         "email": user.email,
         "initials": user.username[:2].upper(),
         "is_ai": user.is_ai,
+        "is_admin": is_admin(user),
     }

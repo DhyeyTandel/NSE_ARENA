@@ -1,35 +1,26 @@
 // components/PriceChart.jsx
 import { createChart, CandlestickSeries } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
+import { chartTheme, candleColors, cssVar, useThemeName } from '../theme';
 
-export function PriceChart({ data, ticker }) {
+export function PriceChart({ data }) {
+  const theme = useThemeName();
   const ref = useRef();
 
   useEffect(() => {
     if (!ref.current || !data || data.length === 0) return;
 
+    const base = chartTheme();
     const chart = createChart(ref.current, {
       width: ref.current.clientWidth,
       height: 160,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: '#7C7367',
-        fontFamily: 'JetBrains Mono'
-      },
-      grid: {
-        vertLines: { color: '#17140F0A' },
-        horzLines: { color: '#17140F0A' }
-      },
-      crosshair: { mode: 1 },
-      rightPriceScale: { borderColor: '#17140F14' },
-      timeScale: { borderColor: '#17140F14', timeVisible: true }
+      ...base,
+      layout: { ...base.layout, background: { color: 'transparent' }, fontFamily: cssVar('--font') },
+      crosshair: { ...base.crosshair, mode: 1 },
+      timeScale: { ...base.timeScale, timeVisible: true },
     });
 
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#1E8A5A', downColor: '#D0342C',
-      borderUpColor: '#1E8A5A', borderDownColor: '#D0342C',
-      wickUpColor: '#1E8A5A66', wickDownColor: '#D0342C66'
-    });
+    const series = chart.addSeries(CandlestickSeries, candleColors());
 
     series.setData(data);
     chart.timeScale().fitContent();
@@ -45,7 +36,7 @@ export function PriceChart({ data, ticker }) {
       window.removeEventListener('resize', handleResize);
       chart.remove();
     };
-  }, [data]);
+  }, [data, theme]);
 
   return <div ref={ref} style={{ width: '100%', height: '160px' }} />;
 }

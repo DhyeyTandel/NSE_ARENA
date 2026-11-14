@@ -17,7 +17,7 @@ normal script error, not a crash or hang. This test locks that in.
 """
 import time
 
-from scripting.engine import run_script, PineEngine
+from scripting.engine import run_script, PineEngine, EXECUTION_BUDGET_SECONDS
 
 OHLCV = [
     {"open": 100 + i, "high": 101 + i, "low": 99 + i, "close": 100.5 + i, "volume": 1000}
@@ -39,7 +39,8 @@ def test_pathological_inputs_complete_quickly_without_crashing():
         start = time.perf_counter()
         result = run_script(code, OHLCV, TIMESTAMPS)
         elapsed = time.perf_counter() - start
-        assert elapsed < 8.0, f"{name} took {elapsed:.3f}s — approaching the engine's own 8s CPU budget"
+        assert elapsed < EXECUTION_BUDGET_SECONDS + 1.0, (
+            f"{name} took {elapsed:.3f}s — past the engine's {EXECUTION_BUDGET_SECONDS}s budget")
         assert result is not None
 
 

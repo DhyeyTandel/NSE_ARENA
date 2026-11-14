@@ -1,10 +1,11 @@
 # tests/test_ai_agent_timeout.py
-"""FOLLOWUP 'also verify': the AI agent's Gemini call had no timeout —
-generate_content_async is awaited (confirmed non-blocking on the event
+"""FOLLOWUP 'also verify': the AI agent's Groq call had no timeout —
+chat.completions.create is awaited (confirmed non-blocking on the event
 loop already), but a hung upstream call would still stall that one AI
 scheduler cycle indefinitely. Wrap it in asyncio.wait_for.
 """
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,14 +27,14 @@ async def test_run_cycle_returns_hold_on_timeout(monkeypatch):
 
     # Patch the module-level constant down to something the test can
     # actually wait for — run_cycle looks it up dynamically at call time.
-    monkeypatch.setattr(agent_module, "GEMINI_CALL_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(agent_module, "GROQ_CALL_TIMEOUT_SECONDS", 0.05)
 
     agent = AIAgent(_portfolio(), order_engine=None)
 
     async def hangs_forever(*args, **kwargs):
         await asyncio.sleep(10)
 
-    monkeypatch.setattr(agent.client.aio.models, "generate_content", hangs_forever)
+    monkeypatch.setattr(agent.client.chat.completions, "create", hangs_forever)
 
     decision = await agent.run_cycle({"RELIANCE": {"price": 1000}})
 
@@ -42,16 +43,17 @@ async def test_run_cycle_returns_hold_on_timeout(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_run_cycle_succeeds_when_gemini_responds_promptly(monkeypatch):
+async def test_run_cycle_succeeds_when_groq_responds_promptly(monkeypatch):
     agent = AIAgent(_portfolio(), order_engine=None)
 
     class FakeResponse:
-        text = '{"action": "hold", "reason": "no clear edge"}'
+        choices = [SimpleNamespace(message=SimpleNamespace(
+            content='{"action": "hold", "reason": "no clear edge"}'))]
 
     async def fast_response(*args, **kwargs):
         return FakeResponse()
 
-    monkeypatch.setattr(agent.client.aio.models, "generate_content", fast_response)
+    monkeypatch.setattr(agent.client.chat.completions, "create", fast_response)
 
     decision = await agent.run_cycle({"RELIANCE": {"price": 1000}})
 

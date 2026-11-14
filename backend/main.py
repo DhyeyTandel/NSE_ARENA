@@ -1,10 +1,11 @@
 # main.py
+import json
 import logging
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import config
@@ -14,7 +15,9 @@ from api.routes import auth, trades, portfolio, leaderboard, websocket
 from api.routes import seasons as seasons_router
 from api.routes import ai as ai_router
 from api.routes import scripts as scripts_router
-from market_data.broadcaster import PriceBroadcaster
+from api.routes import kite as kite_router
+from market_data.broadcaster import PriceBroadcaster, DEFAULT_TICKERS
+from market_data.kite_feed import KiteFeed
 from ai.scheduler import ai_scheduler
 
 configure_logging()
@@ -40,6 +43,9 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 # Global broadcaster instance
 broadcaster = PriceBroadcaster()
+# Optional Kite Connect feed; inert unless KITE_API_KEY/SECRET are set.
+kite_feed = KiteFeed(broadcaster, config.KITE_API_KEY, config.KITE_API_SECRET)
+broadcaster.kite_feed = kite_feed
 
 
 async def ensure_active_season():
@@ -77,18 +83,86 @@ async def ensure_active_season():
             logger.info("Active season: %s", season.name)
 
 
+AI_AGENT_USERNAME = "ai-agent"
+
+
+async def ensure_ai_agent():
+    """Make sure the AI agent has an account and a portfolio in the active season.
+
+    ai/scheduler.py looks up the single User with is_ai=True and skips the
+    cycle if it (or its portfolio) is missing; nothing else creates either,
+    so without this the agent never trades. Idempotent, and safe against two
+    workers booting together: the unique username makes the second INSERT
+    fail with an IntegrityError, which we treat as "already done".
+    """
+    import secrets
+    from sqlalchemy import select
+    from sqlalchemy.exc import IntegrityError
+    from api.routes.auth import pwd_context
+    from db.models import Season, User, Portfolio
+
+    async with async_session() as db:
+        try:
+            ai_user = (
+                await db.execute(select(User).where(User.is_ai == True))
+            ).scalars().first()
+            if not ai_user:
+                ai_user = User(
+                    username=AI_AGENT_USERNAME,
+                    email=f"{AI_AGENT_USERNAME}@nse-arena.local",
+                    # Valid hash of a secret nobody knows: the account
+                    # cannot be logged into, and login stays a clean 401.
+                    hashed_password=pwd_context.hash(secrets.token_urlsafe(32)),
+                    is_ai=True,
+                )
+                db.add(ai_user)
+                await db.flush()
+                logger.info("Created AI agent account '%s'", AI_AGENT_USERNAME)
+
+            season = (
+                await db.execute(select(Season).where(Season.is_active == True))
+            ).scalar_one_or_none()
+            if season:
+                portfolio = (
+                    await db.execute(
+                        select(Portfolio).where(
+                            Portfolio.user_id == ai_user.id,
+                            Portfolio.season_id == season.id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if not portfolio:
+                    db.add(Portfolio(
+                        user_id=ai_user.id,
+                        season_id=season.id,
+                        cash_balance=season.starting_capital,
+                    ))
+                    logger.info("Created AI agent portfolio for %s", season.name)
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            logger.info("AI agent account/portfolio already created elsewhere")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     logger.info("Database initialized")
     app.state.broadcaster = broadcaster
+    app.state.kite_feed = kite_feed
 
     # Ensure at least one season exists
     try:
         await ensure_active_season()
     except Exception as e:
         logger.warning("Could not ensure active season: %s", e)
+
+    # Ensure the AI agent has an account + portfolio to trade with
+    try:
+        await ensure_ai_agent()
+    except Exception as e:
+        logger.warning("Could not ensure AI agent account: %s", e)
 
     # Start background price polling + the single shared WS fan-out task
     fanout_task = None
@@ -98,6 +172,11 @@ async def lifespan(app: FastAPI):
             await broadcaster.start_polling()
             fanout_task = await websocket.start_price_fanout(broadcaster)
             logger.info("Redis connected — live price streaming active")
+            if kite_feed.configured:
+                try:
+                    await kite_feed.start_from_stored()
+                except Exception as e:
+                    logger.warning("Kite feed not started: %s", e)
         else:
             logger.warning("Redis not available — running without live prices")
     except Exception as e:
@@ -119,6 +198,7 @@ async def lifespan(app: FastAPI):
             await fanout_task
         except asyncio.CancelledError:
             pass
+    await kite_feed.stop(clear_token=False)
     await broadcaster.close()
     logger.info("Broadcaster and scheduler shut down")
 
@@ -151,11 +231,19 @@ app.include_router(websocket.router)
 app.include_router(seasons_router.router)
 app.include_router(ai_router.router)
 app.include_router(scripts_router.router)
+app.include_router(kite_router.router)
+app.state.kite_feed = kite_feed
 
 
 @app.get("/")
 async def root():
     return {"message": "NSE Arena API", "version": "1.0.0"}
+
+
+@app.get("/tickers")
+async def list_tickers():
+    """Tickers streamed on the live price feed."""
+    return {"tickers": list(DEFAULT_TICKERS)}
 
 
 @app.get("/health")
@@ -171,30 +259,91 @@ async def health_check():
     }
 
 
-@app.get("/price/{ticker}")
-async def get_price(ticker: str):
-    """GET /price/{ticker} — fetches OHLCV data using yfinance for Indian NSE stocks"""
-    # Try Redis cache first
-    cached = await broadcaster.get_cached_price(ticker)
-    if cached:
-        from market_data.fetcher import MarketDataFetcher
-        ohlcv = await asyncio.to_thread(MarketDataFetcher.get_ohlcv, ticker, period="1mo")
-        return {
-            "ticker": ticker,
-            "current": cached,
-            "ohlcv": ohlcv,
-        }
+PRICE_CACHE_TTL_SECONDS = 60
+INTRADAY_CACHE_TTL_SECONDS = 30  # 1D/1W while the market is open
+PRICE_RATE_LIMIT = 30  # requests per minute per client IP
+DEFAULT_PRICE_RANGE = "1M"
+# range -> (yfinance period, yfinance interval)
+PRICE_RANGES = {
+    "1D": ("1d", "5m"),
+    "1W": ("5d", "30m"),
+    "1M": ("1mo", "1d"),
+    "1Y": ("1y", "1d"),
+}
 
+
+def _ohlcv_cache_key(ticker: str, range_: str) -> str:
+    # Keyed by the yfinance period, which is 1:1 with the range, so the
+    # default 1M key stays "ohlcv:<T>:1mo" (unchanged for existing callers).
+    return f"ohlcv:{ticker}:{PRICE_RANGES[range_][0]}"
+
+
+def _ohlcv_ttl(range_: str) -> int:
+    from datetime import datetime, timezone
+    from engine.market_calendar import is_market_open
+    if range_ in ("1D", "1W") and is_market_open(datetime.now(timezone.utc)):
+        return INTRADAY_CACHE_TTL_SECONDS
+    return PRICE_CACHE_TTL_SECONDS
+
+
+async def _read_ohlcv_cache(ticker: str, range_: str = DEFAULT_PRICE_RANGE):
+    try:
+        raw = await broadcaster.redis.get(_ohlcv_cache_key(ticker, range_))
+        return json.loads(raw) if raw else None
+    except Exception as e:
+        logger.debug("OHLCV cache read skipped for %s: %s", ticker, e)
+        return None
+
+
+async def _write_ohlcv_cache(ticker: str, ohlcv: list, range_: str = DEFAULT_PRICE_RANGE) -> None:
+    try:
+        await broadcaster.redis.set(
+            _ohlcv_cache_key(ticker, range_), json.dumps(ohlcv), ex=_ohlcv_ttl(range_))
+    except Exception as e:
+        logger.debug("OHLCV cache write skipped for %s: %s", ticker, e)
+
+
+@app.get("/price/{ticker}")
+async def get_price(ticker: str, request: Request, range: str = DEFAULT_PRICE_RANGE):
+    """GET /price/{ticker}?range=1D|1W|1M|1Y — OHLCV + current price for an NSE stock.
+
+    Public (the logged-out dashboard preview uses it), so it is validated,
+    rate-limited per client IP, and the OHLCV is cached in Redis per range
+    (60s; 30s for 1D/1W while the market is open)."""
+    from api.rate_limit import check_rate_limit, client_ip
+    from api.validation import normalize_ticker
     from market_data.fetcher import MarketDataFetcher
-    ohlcv, price = await asyncio.gather(
-        asyncio.to_thread(MarketDataFetcher.get_ohlcv, ticker, period="1mo"),
-        asyncio.to_thread(MarketDataFetcher.get_price, ticker)
-    )
-    return {
-        "ticker": ticker,
-        "current": price,
-        "ohlcv": ohlcv,
-    }
+
+    await check_rate_limit(request, bucket="price", identity=client_ip(request),
+                           limit=PRICE_RATE_LIMIT, window_seconds=60)
+    symbol = normalize_ticker(ticker)
+    if symbol is None:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol")
+    if range not in PRICE_RANGES:
+        raise HTTPException(status_code=400, detail="Invalid range")
+    period, interval = PRICE_RANGES[range]
+
+    try:
+        live = await broadcaster.get_cached_price(symbol)
+    except Exception as e:  # Redis down: fall through to yfinance
+        logger.debug("Live price cache read skipped for %s: %s", symbol, e)
+        live = None
+
+    ohlcv = await _read_ohlcv_cache(symbol, range)
+    if ohlcv is None and live:
+        ohlcv = await asyncio.to_thread(
+            MarketDataFetcher.get_ohlcv, symbol, period=period, interval=interval)
+        await _write_ohlcv_cache(symbol, ohlcv, range)
+    elif ohlcv is None:
+        ohlcv, live = await asyncio.gather(
+            asyncio.to_thread(MarketDataFetcher.get_ohlcv, symbol, period=period, interval=interval),
+            asyncio.to_thread(MarketDataFetcher.get_price, symbol),
+        )
+        await _write_ohlcv_cache(symbol, ohlcv, range)
+    elif not live:
+        live = await asyncio.to_thread(MarketDataFetcher.get_price, symbol)
+
+    return {"ticker": symbol, "current": live, "ohlcv": ohlcv, "range": range, "interval": interval}
 
 
 @app.get("/score/{user_id}")

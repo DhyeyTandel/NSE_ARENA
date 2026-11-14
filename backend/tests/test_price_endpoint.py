@@ -77,3 +77,62 @@ async def test_price_ohlcv_has_candles(fastapi_app, mock_fetcher):
     candle = body["ohlcv"][0]
     assert "time" in candle
     assert "close" in candle
+
+
+# ---- range parameter -------------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rng,period,interval", [
+    ("1D", "1d", "5m"), ("1W", "5d", "30m"), ("1M", "1mo", "1d"), ("1Y", "1y", "1d"),
+])
+async def test_range_maps_to_yfinance_args(fastapi_app, rng, period, interval):
+    with patch("market_data.fetcher.MarketDataFetcher.get_ohlcv", return_value=MOCK_OHLCV) as m, \
+         patch("market_data.fetcher.MarketDataFetcher.get_price", return_value=MOCK_PRICE), \
+         patch("main.broadcaster.get_cached_price", new_callable=AsyncMock, return_value=None):
+        async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
+            resp = await c.get(f"/price/RELIANCE?range={rng}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["range"] == rng and body["interval"] == interval
+    m.assert_called_once_with("RELIANCE", period=period, interval=interval)
+
+
+@pytest.mark.asyncio
+async def test_range_defaults_to_1m(fastapi_app, mock_fetcher):
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
+        body = (await c.get("/price/RELIANCE")).json()
+    assert body["range"] == "1M" and body["interval"] == "1d"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", ["5Y", "1d", "", "1M;x"])
+async def test_invalid_range_is_400(fastapi_app, mock_fetcher, bad):
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
+        resp = await c.get("/price/RELIANCE", params={"range": bad})
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_cache_key_and_ttl_per_range(fastapi_app):
+    import main
+    redis = AsyncMock()
+    redis.get.return_value = None
+    with patch("market_data.fetcher.MarketDataFetcher.get_ohlcv", return_value=MOCK_OHLCV), \
+         patch("market_data.fetcher.MarketDataFetcher.get_price", return_value=MOCK_PRICE), \
+         patch("main.broadcaster.get_cached_price", new_callable=AsyncMock, return_value=None), \
+         patch.object(main.broadcaster, "redis", redis, create=True), \
+         patch("engine.market_calendar.is_market_open", return_value=True):
+        async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
+            for rng in ("1D", "1M"):
+                await c.get(f"/price/RELIANCE?range={rng}")
+    read_keys = [call.args[0] for call in redis.get.call_args_list]
+    assert read_keys == ["ohlcv:RELIANCE:1d", "ohlcv:RELIANCE:1mo"]
+    writes = {call.args[0]: call.kwargs["ex"] for call in redis.set.call_args_list}
+    assert writes == {"ohlcv:RELIANCE:1d": 30, "ohlcv:RELIANCE:1mo": 60}
+
+
+def test_intraday_ttl_is_60_when_market_closed():
+    import main
+    with patch("engine.market_calendar.is_market_open", return_value=False):
+        assert main._ohlcv_ttl("1D") == 60
+        assert main._ohlcv_ttl("1W") == 60

@@ -4,10 +4,11 @@ API endpoints for the PineScript-lite scripting engine.
 """
 import asyncio
 import logging
+import threading
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,14 +16,42 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from api.dependencies import get_current_user_optional, get_current_user
 from api.rate_limit import check_rate_limit
+from api.validation import ALLOWED_PERIODS, normalize_ticker
 from market_data.fetcher import MarketDataFetcher
-from scripting.engine import run_script
+from scripting.engine import run_script, EXECUTION_BUDGET_SECONDS
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/scripts", tags=["scripts"])
 
-SCRIPT_TIMEOUT = 10  # seconds max execution
+SCRIPT_TIMEOUT = 10  # seconds the HTTP request waits; engine budget is the real limit
+
+# One running script per user. The slot is released by the worker thread
+# itself (not by the HTTP timeout), so a script that outlives the request
+# still counts until it actually finishes. In-process: with N uvicorn
+# workers the cap is per worker.
+_active_runs: set[int] = set()
+_active_runs_lock = threading.Lock()
+
+
+def _try_acquire_run_slot(user_id: int) -> bool:
+    with _active_runs_lock:
+        if user_id in _active_runs:
+            return False
+        _active_runs.add(user_id)
+        return True
+
+
+def _release_run_slot(user_id: int) -> None:
+    with _active_runs_lock:
+        _active_runs.discard(user_id)
+
+
+def _run_script_and_release(user_id: int, code, ohlcv, timestamps):
+    try:
+        return run_script(code, ohlcv, timestamps)
+    finally:
+        _release_run_slot(user_id)
 
 
 # ── Request / Response models ───────────────────────────────────────────────
@@ -30,8 +59,23 @@ SCRIPT_TIMEOUT = 10  # seconds max execution
 class RunScriptRequest(BaseModel):
     code: str
     ticker: str = "RELIANCE"
-    period: str = "3mo"   # yfinance period: 1mo, 3mo, 6mo, 1y, 2y
-    interval: str = "1d"  # yfinance interval: 1m, 5m, 15m, 1h, 1d
+    period: str = "3mo"   # one of ALLOWED_PERIODS
+    interval: str = "1d"  # accepted for compatibility; not used for fetching
+
+    @field_validator("ticker")
+    @classmethod
+    def _valid_ticker(cls, v: str) -> str:
+        normalized = normalize_ticker(v)
+        if normalized is None:
+            raise ValueError("Invalid ticker symbol")
+        return normalized
+
+    @field_validator("period")
+    @classmethod
+    def _valid_period(cls, v: str) -> str:
+        if v not in ALLOWED_PERIODS:
+            raise ValueError(f"period must be one of: {', '.join(ALLOWED_PERIODS)}")
+        return v
 
 
 class SaveScriptRequest(BaseModel):
@@ -198,33 +242,45 @@ async def run_user_script(req: RunScriptRequest, http_request: Request,
     if len(req.code) > 10_000:
         raise HTTPException(400, "Script too long (max 10,000 characters)")
 
-    # Fetch OHLCV data
-    try:
-        ohlcv = await asyncio.to_thread(
-            MarketDataFetcher.get_ohlcv, req.ticker, req.period
+    if not _try_acquire_run_slot(user.id):
+        raise HTTPException(
+            429, "A script is already running for your account. Wait for it to finish and try again."
         )
-    except Exception as e:
-        logger.warning("Failed to fetch data for %s: %s", req.ticker, e)
-        raise HTTPException(502, f"Could not fetch market data for {req.ticker}")
-
-    if not ohlcv:
-        raise HTTPException(404, f"No data available for {req.ticker}")
-
-    timestamps = [bar["time"] for bar in ohlcv]
-
-    # Execute script with timeout
+    handed_off = False  # True once the worker thread owns (and will release) the slot
     try:
-        result = await asyncio.wait_for(
-            asyncio.to_thread(run_script, req.code, ohlcv, timestamps),
-            timeout=SCRIPT_TIMEOUT,
-        )
-    except asyncio.TimeoutError:
-        raise HTTPException(408, "Script execution timed out (10s limit)")
-    except Exception as e:
-        # Log the real exception server-side; don't hand the client raw
-        # Python exception text (stack internals, file paths, etc).
-        logger.warning("Script execution error for user=%s: %s", user.id, e, exc_info=True)
-        raise HTTPException(500, "Script execution failed — check your script for errors.")
+        # Fetch OHLCV data
+        try:
+            ohlcv = await asyncio.to_thread(
+                MarketDataFetcher.get_ohlcv, req.ticker, req.period
+            )
+        except Exception as e:
+            logger.warning("Failed to fetch data for %s: %s", req.ticker, e)
+            raise HTTPException(502, f"Could not fetch market data for {req.ticker}")
+
+        if not ohlcv:
+            raise HTTPException(404, f"No data available for {req.ticker}")
+
+        timestamps = [bar["time"] for bar in ohlcv]
+
+        # Execute script with timeout. The task is shielded so the HTTP
+        # timeout never cancels the worker: it always runs to completion
+        # and releases the slot in its own `finally`.
+        worker = asyncio.ensure_future(asyncio.to_thread(
+            _run_script_and_release, user.id, req.code, ohlcv, timestamps))
+        handed_off = True
+        try:
+            result = await asyncio.wait_for(asyncio.shield(worker), timeout=SCRIPT_TIMEOUT)
+        except (asyncio.TimeoutError, TimeoutError):
+            raise HTTPException(
+                408, f"Script execution timed out ({EXECUTION_BUDGET_SECONDS:g}s limit)")
+        except Exception as e:
+            # Log the real exception server-side; don't hand the client raw
+            # Python exception text (stack internals, file paths, etc).
+            logger.warning("Script execution error for user=%s: %s", user.id, e, exc_info=True)
+            raise HTTPException(500, "Script execution failed — check your script for errors.")
+    finally:
+        if not handed_off:
+            _release_run_slot(user.id)
 
     return {
         "indicator_title": result.indicator_title,
