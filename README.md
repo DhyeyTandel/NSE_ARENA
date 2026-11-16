@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="frontend/public/logo-full.svg" alt="NSE Arena" height="48" />
+
 # 🏟️ NSE Arena
 
 **A real-time paper trading competition platform for Indian (NSE) markets**

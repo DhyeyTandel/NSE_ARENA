@@ -1,0 +1,49 @@
+/* screens/Pages.css: Leaderboard, AI feed, Profile */
+.lb-stats { margin-bottom: var(--s4); }
+.lb-foot { padding: var(--s3) var(--s4); border-top: 1px solid var(--border); font-size: var(--fs-xs); color: var(--text-2); }
+.rank { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 var(--s1); border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-2); }
+.rank--1 { background: var(--medal-1-bg); color: var(--medal-1-text); font-weight: var(--fw-semibold); }
+.rank--2 { background: var(--medal-2-bg); color: var(--medal-2-text); font-weight: var(--fw-semibold); }
+.rank--3 { background: var(--medal-3-bg); color: var(--medal-3-text); font-weight: var(--fw-semibold); }
+.trader { display: inline-flex; align-items: center; gap: var(--s2); }
+.trader-name { font-weight: var(--fw-medium); }
+.ret { font-weight: var(--fw-medium); }
+
+/* AI feed timeline */
+.timeline { position: relative; list-style: none; margin: 0; padding: var(--s2) 0 var(--s2) var(--s6); }
+.timeline::before { content: ''; position: absolute; left: 7px; top: var(--s4); bottom: var(--s4); width: 2px; background: var(--border); border-radius: 1px; }
+.tl-item { position: relative; padding: var(--s2) var(--s4) var(--s2) 0; }
+.tl-dot { position: absolute; left: calc(-1 * var(--s6) + 2px); top: 20px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--text-2); }
+.tl-dot--buy { border-color: var(--buy); }
+.tl-dot--sell { border-color: var(--sell); }
+.tl-dot--blocked { border-color: var(--loss); }
+.tl-card { padding: var(--s3) var(--s4); background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-card); box-shadow: var(--elev); }
+.tl-top { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.tl-badge { font-weight: var(--fw-semibold); letter-spacing: 0.04em; }
+.tl-ticker { font-weight: var(--fw-semibold); }
+.tl-time { margin-left: auto; font-size: var(--fs-xs); color: var(--text-2); }
+.tl-agent { margin-top: var(--s1); font-size: var(--fs-xs); color: var(--text-2); display: flex; align-items: center; gap: var(--s2); }
+.tl-reason { margin: var(--s2) 0 0; color: var(--text-2); font-size: var(--fs-sm); line-height: var(--lh-loose); }
+.tl-reason.is-clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tl-more { margin-top: var(--s1); padding: 0; border: 0; background: none; color: var(--accent-text); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+.tl-more:hover { text-decoration: underline; }
+.tl-skel { padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s2); }
+
+.agent-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s4); border-top: 1px solid var(--border); }
+.panel-head + .agent-row { border-top: 0; }
+.agent-name { font-weight: var(--fw-medium); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-ret { font-weight: var(--fw-medium); min-width: 56px; text-align: right; }
+.vs-body { padding: var(--s3) var(--s4); }
+.vs-big { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); }
+
+/* Profile */
+.profile-id { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
+.score-big { font-size: var(--fs-3xl); font-weight: var(--fw-semibold); }
+.factor { margin-bottom: var(--s3); }
+.factor-row { display: flex; justify-content: space-between; font-size: var(--fs-sm); margin-bottom: var(--s1); }
+
+@media (max-width: 480px) {
+  .timeline { padding-left: var(--s5); }
+  .tl-dot { left: calc(-1 * var(--s5) + 2px); }
+  .tl-time { margin-left: 0; flex-basis: 100%; }
+}

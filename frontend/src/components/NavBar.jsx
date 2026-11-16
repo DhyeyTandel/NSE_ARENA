@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSeasonStanding } from '../hooks/useSeasonStanding';
 import { ThemeToggle } from './ThemeToggle';
+import { Logo } from './Logo';
 import './NavBar.css';
 
 const NAV_ITEMS = [
@@ -43,9 +44,8 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
 
   return (
     <nav className="nav" aria-label="Main">
-      <button type="button" className="nav-logo" onClick={() => onNavigate('dashboard')}>
-        <span className="nav-mark" aria-hidden="true">N</span>
-        NSE Arena
+      <button type="button" className="nav-logo" aria-label="NSE Arena home" onClick={() => onNavigate('dashboard')}>
+        <Logo size={28} variant="full" />
       </button>
 
       <div className="nav-links">
@@ -63,7 +63,7 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
 
       <div className="nav-right">
         {seasonParts.length > 0 && (
-          <div className="nav-season" data-testid="season-line">{seasonParts.join(' · ')}</div>
+          <div className="nav-season" data-testid="season-line" title={seasonParts.join(' · ')}>{seasonParts.join(' · ')}</div>
         )}
         <div className="nav-tools">
           <ThemeToggle />
@@ -78,12 +78,15 @@ export function NavBar({ activeScreen, onNavigate, user, onLogout }) {
             </button>
             {menuOpen && (
               <div className="nav-menu" role="menu">
-                <div className="nav-menu-name">{user?.username}</div>
+                <div className="nav-menu-head">
+                  <div className="nav-menu-name">{user?.username}</div>
+                  {user?.email && <div className="nav-menu-email">{user.email}</div>}
+                </div>
                 <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onNavigate('profile'); }}>
                   Profile
                 </button>
                 {onLogout && (
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onLogout(); }}>
+                  <button type="button" role="menuitem" className="nav-menu-out" onClick={() => { setMenuOpen(false); onLogout(); }}>
                     Sign out
                   </button>
                 )}

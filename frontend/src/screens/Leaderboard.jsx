@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSeasonStanding } from '../hooks/useSeasonStanding';
+import './Pages.css';
 
 const fmtPct = v => (typeof v === 'number' ? `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}%` : '—');
 
@@ -13,17 +14,19 @@ export function Leaderboard({ authenticated, user }) {
   const [filter, setFilter] = useState('All');
   const standing = useSeasonStanding(authenticated, user);
 
-  // win_rate / trade_count / max_drawdown are not in the leaderboard payload
-  // (max_drawdown is a 0.0 placeholder server-side), so those columns show
-  // "—" instead of an invented figure.
+  // The leaderboard payload carries no win_rate / trade_count / drawdown.
+  // Those columns only appear if the API starts sending them, so no cell is
+  // ever filled with an invented figure.
   const entries = standing.leaderboard.map((e, i) => ({
     rank: e.rank || i + 1, name: e.username, ai: e.is_ai,
     ret: e.total_return_pct, score: e.trader_score,
-    dd: '—',
-    win: typeof e.win_rate === 'number' ? `${Math.round(e.win_rate * 100)}%` : '—',
-    trades: typeof e.trade_count === 'number' ? e.trade_count : '—',
+    win: typeof e.win_rate === 'number' ? `${Math.round(e.win_rate * 100)}%` : null,
+    trades: typeof e.trade_count === 'number' ? e.trade_count : null,
     isMe: user?.id != null && e.user_id === user.id,
   }));
+  const showWin = entries.some(e => e.win != null);
+  const showTrades = entries.some(e => e.trades != null);
+  const colCount = 4 + (showWin ? 1 : 0) + (showTrades ? 1 : 0);
 
   const shown = entries.filter(d =>
     filter === 'All' ? true : filter === 'AI agents' ? d.ai : !d.ai
@@ -33,7 +36,7 @@ export function Leaderboard({ authenticated, user }) {
 
   const seasonLabel = standing.season
     ? `${standing.season.name} · ends in ${standing.daysLeft} ${standing.daysLeft === 1 ? 'day' : 'days'}`
-    : 'No active season';
+    : standing.loading ? 'Loading season' : 'No active season';
 
   return (
     <div className="page">
@@ -52,66 +55,86 @@ export function Leaderboard({ authenticated, user }) {
         </div>
       </div>
 
-      <div className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 'var(--s4)' }}>
-        {standing.me ? (
+      <div className="stats lb-stats" style={{ '--cols': standing.me ? 3 : 1 }}>
+        {standing.loading ? (
+          [0, 1, 2].map(i => (
+            <div className="stat" key={i}>
+              <div className="stat-label"><span className="skel" style={{ '--w': '60px' }} /></div>
+              <div className="stat-value"><span className="skel" style={{ '--w': '80px', '--h': '18px' }} /></div>
+            </div>
+          ))
+        ) : standing.me ? (
           <>
-            <div className="stat"><div className="stat-label">Your rank</div><div className="stat-value">#{standing.rank}</div>
+            <div className="stat"><div className="stat-label">Your rank</div><div className="stat-value num">#{standing.rank}</div>
               {standing.gapToNext != null && (
-                <div className="stat-sub">₹{Math.round(standing.gapToNext).toLocaleString('en-IN')} behind #{standing.aheadRank}</div>
+                <div className="stat-sub num">₹{Math.round(standing.gapToNext).toLocaleString('en-IN')} behind #{standing.aheadRank}</div>
               )}
             </div>
             <div className="stat"><div className="stat-label">Return</div>
-              <div className={`stat-value ${retClass(standing.me.total_return_pct)}`}>{fmtPct(standing.me.total_return_pct)}</div>
+              <div className={`stat-value num ${retClass(standing.me.total_return_pct)}`}>{fmtPct(standing.me.total_return_pct)}</div>
             </div>
-            <div className="stat"><div className="stat-label">Score</div><div className="stat-value">{standing.me.trader_score}</div></div>
+            <div className="stat"><div className="stat-label">Score</div><div className="stat-value num">{standing.me.trader_score}</div></div>
           </>
         ) : (
-          <div className="stat" style={{ gridColumn: '1 / -1' }}>
+          <div className="stat">
             <div className="stat-label">Your standing</div>
-            <div className="stat-sub" style={{ fontSize: '14px' }}>No ranking yet this season</div>
+            <div className="stat-sub" style={{ fontSize: 'var(--fs-md)' }}>No ranking yet this season</div>
           </div>
         )}
       </div>
 
-      <div className="panel">
-        <div className="table-wrap">
+      <div className="panel lb-panel">
+        <div className="table-wrap table-wrap--sticky">
           <table className="tbl">
             <thead>
               <tr>
-                <th style={{ width: 56 }}>Rank</th>
+                <th style={{ width: 64 }}>Rank</th>
                 <th>Trader</th>
                 <th className="r">Return</th>
                 <th className="r">Score</th>
-                <th className="r">Max DD</th>
-                <th className="r">Win rate</th>
-                <th className="r">Trades</th>
+                {showWin && <th className="r">Win rate</th>}
+                {showTrades && <th className="r">Trades</th>}
               </tr>
             </thead>
             <tbody>
-              {shown.length === 0 && (
-                <tr><td colSpan={7} className="empty">No data yet</td></tr>
+              {standing.loading && [0, 1, 2, 3, 4, 5].map(i => (
+                <tr key={`s${i}`} aria-hidden="true">
+                  <td><span className="skel" style={{ '--w': '24px' }} /></td>
+                  <td><span className="skel" style={{ '--w': '140px' }} /></td>
+                  <td className="r"><span className="skel" style={{ '--w': '48px' }} /></td>
+                  <td className="r"><span className="skel" style={{ '--w': '36px' }} /></td>
+                  {showWin && <td className="r"><span className="skel" style={{ '--w': '36px' }} /></td>}
+                  {showTrades && <td className="r"><span className="skel" style={{ '--w': '30px' }} /></td>}
+                </tr>
+              ))}
+              {!standing.loading && shown.length === 0 && (
+                <tr><td colSpan={colCount} className="empty">
+                  <strong>{entries.length === 0 ? 'No traders ranked yet' : `No ${filter === 'AI agents' ? 'AI agents' : 'humans'} ranked yet`}</strong>
+                  Rankings appear once traders have placed trades this season.
+                </td></tr>
               )}
               {shown.map((d, i) => (
                 <tr key={i} className={d.isMe ? 'is-me' : undefined}>
-                  <td className={d.rank <= 3 ? undefined : 'muted'} style={{ fontWeight: d.rank <= 3 ? 600 : 400 }}>{d.rank}</td>
                   <td>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--s2)' }}>
+                    <span className={`rank${d.rank <= 3 ? ` rank--${d.rank}` : ''}`}>{d.rank}</span>
+                  </td>
+                  <td>
+                    <span className="trader">
                       <span className={`avatar${d.ai ? ' avatar--ai' : ''}`} aria-hidden="true">{initials(d.name)}</span>
-                      <span style={{ fontWeight: 500 }}>{d.name}{d.isMe ? ' (you)' : ''}</span>
+                      <span className="trader-name">{d.name}{d.isMe ? ' (you)' : ''}</span>
                       {d.ai && <span className="chip chip--ai">AI</span>}
                     </span>
                   </td>
-                  <td className={`r ${retClass(d.ret)}`} style={{ fontWeight: 500 }}>{fmtPct(d.ret)}</td>
-                  <td className="r">{d.score}</td>
-                  <td className="r muted">{d.dd}</td>
-                  <td className="r muted">{d.win}</td>
-                  <td className="r muted">{d.trades}</td>
+                  <td className={`r num ret ${retClass(d.ret)}`}>{fmtPct(d.ret)}</td>
+                  <td className="r num">{d.score}</td>
+                  {showWin && <td className="r num muted">{d.win ?? '—'}</td>}
+                  {showTrades && <td className="r num muted">{d.trades ?? '—'}</td>}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div style={{ padding: 'var(--s3) var(--s4)', borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-2)' }}>
+        <div className="lb-foot">
           Showing {shown.length} of {standing.traderCount.toLocaleString('en-IN')}
         </div>
       </div>

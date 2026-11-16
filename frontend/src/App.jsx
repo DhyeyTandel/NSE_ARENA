@@ -2,6 +2,7 @@
 import { lazy, Suspense, useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { NavBar } from './components/NavBar';
+import { Logo } from './components/Logo';
 import { AuthScreen } from './screens/AuthScreen';
 import { Dashboard } from './screens/Dashboard';
 import { Leaderboard } from './screens/Leaderboard';
@@ -27,22 +28,9 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh', background: 'var(--canvas)',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 'var(--s4)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', fontWeight: 600, fontSize: '16px' }}>
-          <span className="nav-mark" aria-hidden="true">N</span>
-          NSE Arena
-        </div>
-        <div style={{
-          width: '24px', height: '24px',
-          border: '2px solid var(--border)',
-          borderTopColor: 'var(--accent)',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }} />
+      <div className="boot" role="status" aria-label="Loading">
+        <Logo size={36} variant="full" />
+        <span className="spinner" aria-hidden="true" />
       </div>
     );
   }
@@ -69,7 +57,7 @@ function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--canvas)', color: 'var(--text)' }}>
+    <div className="app-shell">
       <NavBar
         activeScreen={activeScreen}
         onNavigate={setActiveScreen}
@@ -77,7 +65,7 @@ function App() {
         onLogout={logout}
       />
       <main>
-        <Suspense fallback={null}>{renderScreen()}</Suspense>
+        <Suspense fallback={<div className="page"><span className="skel skel--block" style={{ '--h': '320px' }} /></div>}>{renderScreen()}</Suspense>
       </main>
     </div>
   );

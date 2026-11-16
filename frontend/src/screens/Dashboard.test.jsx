@@ -60,10 +60,10 @@ describe('Dashboard (logged out preview)', () => {
     expect(screen.getAllByText('RELIANCE').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders demo positions in the table', () => {
-    render(<Dashboard authenticated={false} />);
-    expect(screen.getAllByText('TCS').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('INFY').length).toBeGreaterThanOrEqual(1);
+  it('shows the empty positions state instead of invented holdings', () => {
+    const { container } = render(<Dashboard authenticated={false} />);
+    expect(screen.getByText('No open positions')).toBeTruthy();
+    expect(container.textContent).not.toContain('2,847.30');
   });
 });
 

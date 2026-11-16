@@ -215,18 +215,18 @@ function registerPineScript(monaco) {
       if (!word) return null;
 
       const docs = {
-        'sma': '**ta.sma(source, length)**\n\nSimple Moving Average — average of last `length` values.',
-        'ema': '**ta.ema(source, length)**\n\nExponential Moving Average — weighted toward recent values.',
+        'sma': '**ta.sma(source, length)**\n\nSimple Moving Average: average of last `length` values.',
+        'ema': '**ta.ema(source, length)**\n\nExponential Moving Average: weighted toward recent values.',
         'rsi': '**ta.rsi(source, length)**\n\nRelative Strength Index (0–100). >70 = overbought, <30 = oversold.',
         'macd': '**ta.macd(source, fast, slow, signal)**\n\nReturns [macdLine, signalLine, histogram].',
         'bbands': '**ta.bbands(source, length, mult)**\n\nReturns [upper, middle, lower] Bollinger Bands.',
-        'atr': '**ta.atr(high, low, close, length)**\n\nAverage True Range — measures volatility.',
+        'atr': '**ta.atr(high, low, close, length)**\n\nAverage True Range: measures volatility.',
         'vwap': '**ta.vwap(close, volume)**\n\nVolume Weighted Average Price.',
-        'close': '**close** — Closing price series for each bar.',
-        'open': '**open** — Opening price series for each bar.',
-        'high': '**high** — High price series for each bar.',
-        'low': '**low** — Low price series for each bar.',
-        'volume': '**volume** — Trading volume series for each bar.',
+        'close': '**close**: Closing price series for each bar.',
+        'open': '**open**: Opening price series for each bar.',
+        'high': '**high**: High price series for each bar.',
+        'low': '**low**: Low price series for each bar.',
+        'volume': '**volume**: Trading volume series for each bar.',
       };
 
       const doc = docs[word.word];

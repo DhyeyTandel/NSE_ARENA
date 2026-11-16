@@ -1,7 +1,23 @@
 // components/PositionsTable.jsx
 import { useState, useEffect, useRef } from 'react';
 
-export function PositionsTable({ positions, livePrices = {} }) {
+function SkeletonRows() {
+  return (
+    <div className="pos-skel" aria-hidden="true">
+      {[0, 1, 2].map(i => (
+        <div key={i} className="pos-skel-row">
+          <span className="skel" style={{ '--w': '90px' }} />
+          <span className="skel" style={{ '--w': '40px' }} />
+          <span className="skel" style={{ '--w': '70px' }} />
+          <span className="skel" style={{ '--w': '70px' }} />
+          <span className="skel" style={{ '--w': '60px' }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function PositionsTable({ positions, livePrices = {}, loading = false }) {
   const [flashTickers, setFlashTickers] = useState({});
   const prevPrices = useRef({});
 
@@ -24,11 +40,23 @@ export function PositionsTable({ positions, livePrices = {} }) {
     prevPrices.current = updated;
   }, [livePrices]);
 
+  if (loading) {
+    return (
+      <div>
+        <div className="panel-head"><h3 className="panel-title">Open positions</h3></div>
+        <SkeletonRows />
+      </div>
+    );
+  }
+
   if (!positions || positions.length === 0) {
     return (
       <div>
         <div className="panel-head"><h3 className="panel-title">Open positions</h3></div>
         <div className="empty">
+          <svg className="empty-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 7h16v12H4zM9 7V5h6v2M4 12h16" />
+          </svg>
           <strong>No open positions</strong>
           Place your first trade using the order panel
         </div>
@@ -44,7 +72,7 @@ export function PositionsTable({ positions, livePrices = {} }) {
       <div className="panel-head">
         <h3 className="panel-title">Open positions</h3>
         <span className="panel-sub">
-          {positions.length} holdings · ₹{Math.round(invested).toLocaleString('en-IN')} invested
+          {positions.length} {positions.length === 1 ? 'holding' : 'holdings'} · ₹{Math.round(invested).toLocaleString('en-IN')} invested
         </span>
       </div>
       <div className="table-wrap">
@@ -68,12 +96,9 @@ export function PositionsTable({ positions, livePrices = {} }) {
               const cls = pnl >= 0 ? 'up' : 'dn';
               const flash = flashTickers[pos.ticker];
               return (
-                <tr key={i} style={{
-                  background: flash === 'up' ? 'var(--gain-bg)' : flash === 'down' ? 'var(--loss-bg)' : undefined,
-                  transition: 'background 0.3s',
-                }}>
+                <tr key={i} className={flash ? `pos-flash-${flash}` : undefined}>
                   <td>
-                    <span style={{ fontWeight: 500 }}>{pos.ticker}</span>{' '}
+                    <span className="pos-sym">{pos.ticker}</span>{' '}
                     <span className={`chip${pos.state === 'pending' ? ' chip--sell' : ''}`}>
                       {pos.state === 'pending' ? 'T+1' : pos.state}
                     </span>
@@ -81,10 +106,10 @@ export function PositionsTable({ positions, livePrices = {} }) {
                   <td className="r">{pos.quantity}</td>
                   <td className="r">{money(pos.avg_price)}</td>
                   <td className="r">{money(currentPrice)}</td>
-                  <td className={`r ${cls}`} style={{ fontWeight: 500 }}>
+                  <td className={`r pos-pnl ${cls}`}>
                     {pnl >= 0 ? '+' : '−'}₹{Math.abs(Math.round(pnl)).toLocaleString('en-IN')}
                   </td>
-                  <td className={`r ${cls}`}>{pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%</td>
+                  <td className={`r ${cls}`}>{pnl >= 0 ? '+' : '−'}{Math.abs(pnlPct).toFixed(2)}%</td>
                 </tr>
               );
             })}

@@ -1,5 +1,5 @@
 // screens/Dashboard.jsx
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { TradingViewChart } from '../components/TradingViewChart';
 import { OrderPanel } from '../components/OrderPanel';
@@ -10,28 +10,66 @@ import { useSeasonStanding } from '../hooks/useSeasonStanding';
 import { API_URL, WS_URL } from '../config';
 import './Dashboard.css';
 
-const DEMO_POSITIONS = [
-  { ticker: 'RELIANCE', quantity: 10, avg_price: 2847.30, current_price: 2891.45, state: 'confirmed' },
-  { ticker: 'TCS', quantity: 5, avg_price: 3920.00, current_price: 3885.60, state: 'confirmed' },
-  { ticker: 'INFY', quantity: 15, avg_price: 1520.75, current_price: 1548.20, state: 'pending' },
-];
+const fmt2 = n => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signedPct = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}%`;
+const chgClass = v => (typeof v !== 'number' ? 'muted' : v >= 0 ? 'up' : 'dn');
 
+// One watchlist row. Remembers the previous price so a tick up/down can
+// flash the row green/red (the overlay animation is a no-op under
+// prefers-reduced-motion).
+function WatchRow({ ticker, tick, selected, onPick }) {
+  const last = tick?.price;
+  const chg = tick?.change_pct;
+  const hasChg = typeof chg === 'number';
+  const prev = useRef(undefined);
+  const [flash, setFlash] = useState(null);
+
+  useEffect(() => {
+    if (typeof last !== 'number') return;
+    if (typeof prev.current === 'number' && prev.current !== last) {
+      setFlash(f => ({ dir: last > prev.current ? 'up' : 'dn', id: (f?.id ?? 0) + 1 }));
+    }
+    prev.current = last;
+  }, [last]);
+
+  return (
+    <li
+      data-ticker={ticker} role="option" aria-selected={selected} tabIndex={0}
+      className={`wl-row${selected ? ' is-selected' : ''}`}
+      onClick={() => onPick(ticker)}
+      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onPick(ticker); } }}
+    >
+      {flash && <span key={flash.id} className={`wl-flash wl-flash--${flash.dir}`} aria-hidden="true" />}
+      <span className="wl-sym">{ticker}</span>
+      <span className={`wl-chg ${hasChg ? chgClass(chg) : 'muted'}`}>{hasChg ? signedPct(chg) : '—'}</span>
+      <span className="wl-px">{typeof last === 'number' ? fmt2(last) : '—'}</span>
+      <span className="wl-actions">
+        <button type="button" className="wl-b" aria-label={`Buy ${ticker}`} title="Buy"
+          onClick={e => { e.stopPropagation(); onPick(ticker, 'buy'); }}>B</button>
+        <button type="button" className="wl-s" aria-label={`Sell ${ticker}`} title="Sell"
+          onClick={e => { e.stopPropagation(); onPick(ticker, 'sell'); }}>S</button>
+      </span>
+    </li>
+  );
+}
 
 export function Dashboard({ authenticated, user }) {
   const [selectedTicker, setSelectedTicker] = useState('RELIANCE');
   const [chartRange, setChartRange] = useState('1M');
   const [watchlist, setWatchlist] = useState(null); // null until /tickers answers
+  const [wlSettled, setWlSettled] = useState(false); // /tickers answered or failed
   const [filter, setFilter] = useState('');
   const [orderSide, setOrderSide] = useState('buy');
   const [wlOpen, setWlOpen] = useState(false); // collapsible on narrow screens only
-  const { portfolio, refetch: refetchPortfolio } = usePortfolio(authenticated);
+  const { portfolio, loading: portfolioLoading, refetch: refetchPortfolio } = usePortfolio(authenticated);
   const { prices: livePrices, connected: wsConnected } = useWebSocket(WS_URL, authenticated);
 
   useEffect(() => {
     let cancelled = false;
     axios.get(`${API_URL}/tickers`)
       .then(res => { if (!cancelled && Array.isArray(res.data?.tickers)) setWatchlist(res.data.tickers); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setWlSettled(true); });
     return () => { cancelled = true; };
   }, []);
 
@@ -61,14 +99,11 @@ export function Dashboard({ authenticated, user }) {
     return q ? list.filter(t => t.toUpperCase().includes(q)) : list;
   }, [watchlist, livePrices, filter]);
 
-  const positions = useMemo(() => {
-    // DEMO_POSITIONS is a preview for logged-out visitors only. Once
-    // authenticated, always show the real holdings — even an empty
-    // array — never fake positions a real trader could mistake for
-    // their actual portfolio.
-    if (!authenticated) return DEMO_POSITIONS;
-    return portfolio?.holdings ?? [];
-  }, [portfolio, authenticated]);
+  // Only real holdings are ever shown; signed-out visitors see none.
+  const positions = useMemo(
+    () => (authenticated ? (portfolio?.holdings ?? []) : []),
+    [portfolio, authenticated],
+  );
 
   const standing = useSeasonStanding(authenticated, user);
 
@@ -115,24 +150,30 @@ export function Dashboard({ authenticated, user }) {
         ? { label: 'Market closed', dot: 'var(--text-2)', color: 'var(--text-2)', pulse: false }
         : { label: 'Connecting', dot: 'var(--text-2)', color: 'var(--text-2)', pulse: false };
 
+  // Resolves to { ok, error } so the order panel can show the failure inline.
   const handleSubmit = async (order) => {
-    if (!authenticated) return;
+    if (!authenticated) return { ok: false, error: 'Sign in to trade' };
     try {
       const response = await fetch(`${API_URL}/trades`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify(order),
       });
-      if (response.ok) refetchPortfolio();
-      else { const err = await response.json(); alert(err.detail || 'Trade failed'); }
-    } catch { alert('Network error — trade not submitted.'); }
+      if (response.ok) { refetchPortfolio(); return { ok: true }; }
+      let detail = '';
+      try { detail = (await response.json()).detail; } catch { /* non-JSON error body */ }
+      return { ok: false, error: typeof detail === 'string' && detail ? detail : 'Trade failed' };
+    } catch {
+      return { ok: false, error: 'Network error: trade not submitted.' };
+    }
   };
 
   const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
-  const px = n => (typeof n === 'number' ? '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—');
+  const px = n => (typeof n === 'number' ? '₹' + fmt2(n) : '—');
   const pnlUp = stats.pnl >= 0;
-  const signed = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}%`;
-  const chgClass = v => (typeof v !== 'number' ? 'muted' : v >= 0 ? 'up' : 'dn');
+  const signed = signedPct;
+  const statsLoading = authenticated && portfolioLoading && !portfolio;
+  const wlLoading = !wlSettled && watchTickers.length === 0;
 
   const prevClose = selectedLivePrice?.previous_close;
   const absChange = typeof displayPrice === 'number' && typeof prevClose === 'number' ? displayPrice - prevClose : null;
@@ -149,6 +190,26 @@ export function Dashboard({ authenticated, user }) {
     if (side) setOrderSide(side);
   };
 
+  const chartHeader = (
+    <div className="sv-id">
+      <div className="sv-sym">
+        <h2>{selectedTicker}</h2>
+        <span className="chip">NSE</span>
+      </div>
+      <div className="sv-quote">
+        <span className="sv-price num">{displayPrice != null ? px(displayPrice) : '—'}</span>
+        <span className={`sv-chg num ${chgClass(displayChangePct)}`}>
+          {displayChangePct == null ? '—' : signed(displayChangePct)}
+        </span>
+        {absChange != null && (
+          <span className={`sv-chg num ${chgClass(absChange)}`}>
+            {absChange >= 0 ? '+' : '−'}₹{fmt2(Math.abs(absChange))}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="dash">
       {/* Watchlist */}
@@ -163,80 +224,31 @@ export function Dashboard({ authenticated, user }) {
             placeholder="Search stocks" aria-label="Filter tickers"
           />
         </div>
-        <ul className="wl-list" data-testid="watchlist" role="listbox" aria-label="Stocks">
-          {watchTickers.map((ticker) => {
-            const chg = livePrices[ticker]?.change_pct;
-            const last = livePrices[ticker]?.price;
-            const hasChg = typeof chg === 'number';
-            const selected = ticker === selectedTicker;
-            return (
-              <li
-                key={ticker} data-ticker={ticker} role="option" aria-selected={selected} tabIndex={0}
-                className={`wl-row${selected ? ' is-selected' : ''}`}
-                onClick={() => pickTicker(ticker)}
-                onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickTicker(ticker); } }}
-              >
-                <span className="wl-sym">{ticker}</span>
-                <span className={`wl-chg ${hasChg ? chgClass(chg) : 'muted'}`}>{hasChg ? signed(chg) : '—'}</span>
-                <span className="wl-px">{typeof last === 'number' ? last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</span>
-                <span className="wl-actions">
-                  <button type="button" className="wl-b" aria-label={`Buy ${ticker}`} title="Buy"
-                    onClick={e => { e.stopPropagation(); pickTicker(ticker, 'buy'); }}>B</button>
-                  <button type="button" className="wl-s" aria-label={`Sell ${ticker}`} title="Sell"
-                    onClick={e => { e.stopPropagation(); pickTicker(ticker, 'sell'); }}>S</button>
-                </span>
-              </li>
-            );
-          })}
+        <ul className="wl-list" data-testid="watchlist" role="listbox" aria-label="Stocks" aria-busy={wlLoading}>
+          {wlLoading && [0, 1, 2, 3, 4, 5, 6, 7].map(i => (
+            <li key={i} className="wl-row wl-row--skel" aria-hidden="true">
+              <span className="skel" style={{ '--w': '84px' }} />
+              <span className="skel" style={{ '--w': '52px', marginLeft: 'auto' }} />
+              <span className="skel" style={{ '--w': '64px' }} />
+            </li>
+          ))}
+          {!wlLoading && watchTickers.length === 0 && (
+            <li className="wl-empty">{filter.trim() ? `No stocks match "${filter.trim()}"` : 'No stocks available'}</li>
+          )}
+          {watchTickers.map(ticker => (
+            <WatchRow
+              key={ticker} ticker={ticker} tick={livePrices[ticker]}
+              selected={ticker === selectedTicker} onPick={pickTicker}
+            />
+          ))}
         </ul>
         <div className="wl-foot">{watchTickers.length} {watchTickers.length === 1 ? 'stock' : 'stocks'}</div>
       </aside>
 
       {/* Content */}
       <div className="dash-main">
-        <div className="stats">
-          <div className="stat">
-            <div className="stat-label">Portfolio value</div>
-            <div className="stat-value">{inr(stats.totalValue)}</div>
-            <div className="stat-sub">{inr(stats.cashBalance)} in cash</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">Season P&L</div>
-            <div className={`stat-value ${pnlUp ? 'up' : 'dn'}`}>{pnlUp ? '+' : '−'}{inr(Math.abs(stats.pnl))}</div>
-            <div className={`stat-sub ${pnlUp ? 'up' : 'dn'}`}>{pnlUp ? '+' : ''}{stats.pnlPct.toFixed(1)}% on ₹1L capital</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">Trader score</div>
-            <div className="stat-value">
-              {standing.score ? standing.score.final_score : '—'}
-              {standing.score?.grade && <> <span className="chip chip--ai" style={{ verticalAlign: 'middle' }}>{standing.score.grade}</span></>}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">Rank</div>
-            <div className="stat-value">{standing.rank != null ? `#${standing.rank}` : '—'}</div>
-            {standing.gapToNext != null && (
-              <div className="stat-sub">{inr(standing.gapToNext)} behind #{standing.aheadRank}</div>
-            )}
-          </div>
-        </div>
-
-        <div className="sv-head">
-          <div>
-            <div className="sv-sym">
-              <h2>{selectedTicker}</h2>
-              <span className="chip">NSE</span>
-            </div>
-            <div className="sv-price">{displayPrice != null ? px(displayPrice) : '—'}</div>
-            <div className="sv-chg">
-              <span className={chgClass(displayChangePct)}>
-                {displayChangePct == null ? '—' : signed(displayChangePct)}
-              </span>
-              {absChange != null && (
-                <span className={chgClass(absChange)}>{absChange >= 0 ? '+' : '−'}₹{Math.abs(absChange).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              )}
-            </div>
-          </div>
+        <div className="dash-bar">
+          <h1 className="dash-title">Overview</h1>
           <div className="feed">
             <span className="feed-dot" style={{ background: feed.dot, animation: feed.pulse ? 'pulse 2s infinite' : 'none' }} />
             <span style={{ color: feed.color, fontWeight: 500 }}>{feed.label}</span>
@@ -249,17 +261,54 @@ export function Dashboard({ authenticated, user }) {
           </div>
         </div>
 
+        <div className="stats">
+          <div className="stat">
+            <div className="stat-label">Portfolio value</div>
+            <div className="stat-value num">{statsLoading ? <span className="skel" style={{ '--w': '96px', '--h': '18px' }} /> : inr(stats.totalValue)}</div>
+            <div className="stat-sub num">{statsLoading ? <span className="skel" style={{ '--w': '70px' }} /> : `${inr(stats.cashBalance)} in cash`}</div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">Season P&L</div>
+            <div className={`stat-value num ${statsLoading ? '' : pnlUp ? 'up' : 'dn'}`}>
+              {statsLoading ? <span className="skel" style={{ '--w': '80px', '--h': '18px' }} /> : <>{pnlUp ? '+' : '−'}{inr(Math.abs(stats.pnl))}</>}
+            </div>
+            <div className={`stat-sub num ${statsLoading ? '' : pnlUp ? 'up' : 'dn'}`}>
+              {statsLoading ? <span className="skel" style={{ '--w': '90px' }} /> : `${pnlUp ? '+' : ''}${stats.pnlPct.toFixed(1)}% on ₹1L capital`}
+            </div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">Trader score</div>
+            <div className="stat-value num">
+              {standing.loading && authenticated ? <span className="skel" style={{ '--w': '48px', '--h': '18px' }} /> : (
+                <>
+                  {standing.score ? standing.score.final_score : '—'}
+                  {standing.score?.grade && <> <span className="chip chip--ai stat-chip">{standing.score.grade}</span></>}
+                </>
+              )}
+            </div>
+          </div>
+          <div className="stat">
+            <div className="stat-label">Rank</div>
+            <div className="stat-value num">
+              {standing.loading && authenticated ? <span className="skel" style={{ '--w': '40px', '--h': '18px' }} /> : (standing.rank != null ? `#${standing.rank}` : '—')}
+            </div>
+            {standing.gapToNext != null && (
+              <div className="stat-sub num">{inr(standing.gapToNext)} behind #{standing.aheadRank}</div>
+            )}
+          </div>
+        </div>
+
         <div className="sv-grid">
           <div className="panel">
             <div className="sv-chart">
               <TradingViewChart key={selectedTicker} symbol={selectedTicker} height={360}
-                range={chartRange} onRangeChange={setChartRange} />
+                range={chartRange} onRangeChange={setChartRange} header={chartHeader} />
             </div>
             <dl className="keystats keystats-wrap">
               {keyStats.map(([label, value, fmt]) => (
                 <div key={label}>
                   <dt>{label}</dt>
-                  <dd>{typeof value === 'number' ? fmt(value) : '—'}</dd>
+                  <dd className="num">{typeof value === 'number' ? fmt(value) : '—'}</dd>
                 </div>
               ))}
             </dl>
@@ -277,7 +326,7 @@ export function Dashboard({ authenticated, user }) {
         </div>
 
         <div className="panel">
-          <PositionsTable positions={positions} livePrices={livePrices} />
+          <PositionsTable positions={positions} livePrices={livePrices} loading={authenticated && portfolioLoading && !portfolio} />
         </div>
       </div>
     </div>

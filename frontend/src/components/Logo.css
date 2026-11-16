@@ -1,0 +1,6 @@
+/* components/Logo.css */
+.logo { display: inline-flex; align-items: center; gap: 0.6em; line-height: 1; flex: none; }
+.logo-mark { display: block; flex: none; }
+.logo-word { color: var(--logo-word, var(--text)); letter-spacing: -0.01em; white-space: nowrap; }
+.logo-word-strong { font-weight: 700; }
+.logo-word-light { font-weight: 500; }

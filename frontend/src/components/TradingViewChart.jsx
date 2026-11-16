@@ -9,7 +9,7 @@ import { API_URL as API_BASE } from '../config';
 import { RANGES, INTRADAY, IST_OFFSET_SECONDS } from './chartRange';
 import { chartTheme, candleColors, cssVar, useThemeName } from '../theme';
 
-function TradingViewChartInner({ symbol = 'RELIANCE', height = 400, range = '1M', onRangeChange }) {
+function TradingViewChartInner({ symbol = 'RELIANCE', height = 400, range = '1M', onRangeChange, header = null }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const candleRef = useRef(null);
@@ -176,6 +176,7 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400, range = '1M'
   return (
     <>
     <div className="chart-head">
+      <div className="chart-head-main">{header}</div>
       <div className="seg" role="group" aria-label="Chart range">
         {RANGES.map(r => (
           <button key={r} type="button" aria-pressed={range === r}
@@ -193,36 +194,20 @@ function TradingViewChartInner({ symbol = 'RELIANCE', height = 400, range = '1M'
           height: '100%',
           overflow: 'hidden',
           opacity: loading && hasData ? 0.45 : 1,
-          transition: 'opacity 0.15s',
+          transition: 'opacity var(--t-base)',
         }}
       />
 
       {loading && !hasData && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--overlay)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', fontSize: '13px', color: 'var(--text-2)' }}>
-            <div style={{
-              width: '16px', height: '16px',
-              border: '2px solid var(--border)',
-              borderTopColor: 'var(--accent)',
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-            }} />
-            Loading {symbol}
-          </div>
+        <div className="chart-overlay" role="status">
+          <span className="skel skel--block chart-skel" aria-hidden="true" />
+          <span className="chart-overlay-label"><span className="spinner" aria-hidden="true" /> Loading {symbol}</span>
         </div>
       )}
 
       {error && !loading && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--overlay)',
-        }}>
-          <span style={{ fontSize: '13px', color: 'var(--loss-text)' }}>{error}</span>
+        <div className="chart-overlay chart-overlay--error" role="alert">
+          <span>{error}</span>
         </div>
       )}
     </div>

@@ -20,38 +20,47 @@ sellSignal = ta.crossunder(fast, slow)
 
 const PERIODS = ['1mo', '3mo', '6mo', '1y']; // sent to the API as-is
 
-const MY_SCRIPTS = [
-  { name: 'golden-cross.pine', active: true },
-  { name: 'rsi-divergence.pine', active: false },
-  { name: 'bb-squeeze.pine', active: false },
-];
-
-const TEMPLATES = ['sma-crossover', 'macd-basic', 'rsi-oversold'];
-
 export function ScriptEditor({ authenticated }) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [ticker] = useState('RELIANCE');
   const [period, setPeriod] = useState('3mo');
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState([]);
+  const [myScripts, setMyScripts] = useState(null); // null while loading; [] when none saved
+  const [activeName, setActiveName] = useState(''); // name of the loaded saved script / template
 
   const [ohlcv, setOhlcv] = useState([]);
   const [plots, setPlots] = useState([]);
   const [hlines, setHlines] = useState([]);
 
-  const [consoleLogs, setConsoleLogs] = useState([
-    { type: 'info', text: '✓ parsed in 12ms · 2 plots, 2 signals' },
-  ]);
+  const [indicatorTitle, setIndicatorTitle] = useState('');
+  const [consoleLogs, setConsoleLogs] = useState([]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
         const res = await fetch(`${API}/api/scripts/templates`);
         if (res.ok) setTemplates(await res.json());
-      } catch { /* templates rail falls back to TEMPLATES below */ }
+      } catch { /* no templates shown if the request fails */ }
     };
     fetchTemplates();
   }, []);
+
+  const fetchMine = useCallback(async () => {
+    if (!authenticated) { setMyScripts([]); return; }
+    try {
+      const res = await fetch(`${API}/api/scripts/mine`, { credentials: 'include' });
+      const rows = res.ok ? await res.json() : [];
+      setMyScripts(Array.isArray(rows) ? rows : []);
+    } catch { setMyScripts([]); }
+  }, [authenticated]);
+  useEffect(() => { fetchMine(); }, [fetchMine]);
+
+  const loadScript = (item) => {
+    if (typeof item?.code !== 'string') return;
+    setCode(item.code);
+    setActiveName(item.name);
+  };
 
   const handleRun = useCallback(async () => {
     if (loading) return;
@@ -75,6 +84,7 @@ export function ScriptEditor({ authenticated }) {
       setOhlcv(data.ohlcv || []);
       setPlots(data.plots || []);
       setHlines(data.hlines || []);
+      setIndicatorTitle(data.indicator_title || '');
 
       const newLogs = [];
       if (data.errors?.length > 0) data.errors.forEach(e => newLogs.push({ type: 'error', text: e }));
@@ -103,10 +113,11 @@ export function ScriptEditor({ authenticated }) {
       setConsoleLogs(prev => [...prev,
         { type: res.ok ? 'success' : 'error', text: res.ok ? `Script "${name}" saved.` : 'Failed to save.' },
       ]);
+      if (res.ok) { setActiveName(name); fetchMine(); }
     } catch {
-      setConsoleLogs(prev => [...prev, { type: 'error', text: 'Network error — could not save.' }]);
+      setConsoleLogs(prev => [...prev, { type: 'error', text: 'Network error: could not save.' }]);
     }
-  }, [code, authenticated]);
+  }, [code, authenticated, fetchMine]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -120,7 +131,7 @@ export function ScriptEditor({ authenticated }) {
     <div className="script-editor">
       <div className="se-toolbar">
         <div>
-          <h1>golden-cross.pine</h1>
+          <h1>{activeName || 'Untitled script'}</h1>
           <div className="se-toolbar__sub">PineScript-lite</div>
         </div>
         <div className="se-toolbar__right">
@@ -143,14 +154,27 @@ export function ScriptEditor({ authenticated }) {
         <div className="se-panes__inner">
           <div className="se-rail">
             <div className="se-rail__label">My scripts</div>
-            {MY_SCRIPTS.map(f => (
-              <div key={f.name} className={`se-rail__item${f.active ? ' se-rail__item--active' : ''}`}>
-                {f.name}
+            {myScripts === null && (
+              <div className="se-rail__skel" aria-hidden="true">
+                <span className="skel" style={{ '--w': '80%' }} /><span className="skel" style={{ '--w': '65%' }} />
               </div>
+            )}
+            {myScripts !== null && myScripts.length === 0 && (
+              <div className="se-rail__empty">{authenticated ? 'No saved scripts yet. Use Save to keep one.' : 'Sign in to save scripts.'}</div>
+            )}
+            {(myScripts || []).map(f => (
+              <button type="button" key={f.id} onClick={() => loadScript(f)}
+                className={`se-rail__item${activeName === f.name ? ' se-rail__item--active' : ''}`}>
+                {f.name}
+              </button>
             ))}
             <div className="se-rail__label se-rail__gap">Templates</div>
-            {(templates.length > 0 ? templates.map(t => t.name) : TEMPLATES).map(t => (
-              <div key={t} className="se-rail__item">{t}</div>
+            {templates.length === 0 && <div className="se-rail__empty">No templates available.</div>}
+            {templates.map(t => (
+              <button type="button" key={t.name} title={t.description} onClick={() => loadScript(t)}
+                className={`se-rail__item${activeName === t.name ? ' se-rail__item--active' : ''}`}>
+                {t.name}
+              </button>
             ))}
           </div>
 
@@ -160,6 +184,7 @@ export function ScriptEditor({ authenticated }) {
             </div>
             <div className="se-code__console">
               <div style={{ marginBottom: 'var(--s1)' }}>// console</div>
+              {consoleLogs.length === 0 && <div>Run output will appear here.</div>}
               {consoleLogs.slice(-3).map((log, i) => (
                 <div key={i} className={log.type === 'success' ? 'se-code__console-ok' : log.type === 'error' ? 'dn' : ''}>
                   {log.text}
@@ -170,10 +195,14 @@ export function ScriptEditor({ authenticated }) {
 
           <div className="se-output">
             <div className="se-output__header">
-              <span>{ticker} · 1D</span>
+              <span>{indicatorTitle ? `${indicatorTitle} · ${ticker}` : `${ticker} · 1D`}</span>
               <span className="se-legend">
-                <span style={{ color: 'var(--accent-text)' }}>SMA 50</span>
-                <span style={{ color: 'var(--sell-text)' }}>SMA 200</span>
+                {plots.filter(p => p.title).map((p, i) => (
+                  <span key={i} className="se-legend__item">
+                    <span className="se-legend__swatch" style={{ background: p.color || 'var(--chart-series-1)' }} aria-hidden="true" />
+                    {p.title}
+                  </span>
+                ))}
               </span>
             </div>
             {ohlcv.length > 0 ? (
