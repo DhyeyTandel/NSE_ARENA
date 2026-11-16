@@ -4,7 +4,7 @@ import json
 import logging
 from groq import AsyncGroq
 from .risk_memory import AIRiskMemory
-from .guardrails import RiskGuardrail
+from .guardrails import MAX_DRAWDOWN_PCT, MAX_POSITION_PCT, STOP_LOSS_PCT, RiskGuardrail, pct_label
 from .prompts import SYSTEM_PROMPT, RESPONSE_FORMAT
 from config import GROQ_API_KEY, GROQ_MODEL
 from services.trading import TradeRejected
@@ -60,6 +60,18 @@ class AIAgent:
             self.memory.record_violation(decision, result.reason)
             return {"action": "blocked", "reason": result.reason}
 
+        if decision["action"] == "buy":
+            # Aggregate per-ticker cap: the guardrail above only sees this
+            # order in isolation, so repeated 20% buys could stack up.
+            allowed, note = self.guardrail.cap_buy_quantity(decision, self.portfolio, market_data)
+            if allowed <= 0:
+                self.memory.record_violation(decision, note)
+                return {"action": "blocked", "reason": note}
+            if note:
+                logger.info(note)
+                decision["quantity"] = allowed
+                decision["reasoning"] = f"{decision.get('reasoning') or ''} [{note}]".strip()
+
         if decision["action"] != "hold":
             try:
                 await self.order_engine.submit(self._to_order(decision), market_data)
@@ -93,9 +105,10 @@ Recovery to break even: {recovery_needed:+.1%}
 Days left in season: {self.portfolio.get('days_remaining', 0)}
 
 === HARD LIMITS (your engine will reject violations) ===
-Max single position: 20% of capital = ₹{pv * 0.20:,.0f}
+Max single position: {pct_label(MAX_POSITION_PCT)} of portfolio value = ₹{pv * MAX_POSITION_PCT:,.0f} (existing holding plus new buy; larger buys are reduced)
 Stop loss: MANDATORY on every trade
-Kill switch: trading halted if drawdown exceeds -15%
+Auto stop loss: any holding down more than {pct_label(STOP_LOSS_PCT)} from its average price is sold in full at the start of each cycle
+Kill switch: trading halted if drawdown exceeds {pct_label(MAX_DRAWDOWN_PCT)}
 
 === YOUR RECENT HISTORY ===
 {self.memory.format_for_prompt()}

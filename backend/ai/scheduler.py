@@ -78,6 +78,9 @@ class AIScheduler:
         from ai.agent import AIAgent
         from ai.execution import AIOrderExecutionService
         from ai.risk_memory import AIRiskMemory
+        from ai.guardrails import STOP_LOSS_PCT, find_stop_loss_breaches, pct_label
+        from engine.models import Order, OrderSide, OrderType
+        from services.trading import TradeRejected
 
         logger.info("AI cycle starting...")
 
@@ -122,20 +125,104 @@ class AIScheduler:
                 )
                 positions = result.scalars().all()
 
-                # Build portfolio dict for the AI agent
                 now = db_utcnow()
                 days_remaining = max(0, (season.end_date - now).days)
 
+                # Fetch market data for watchlist
+                market_data = {}
+                for ticker in AI_WATCHLIST:
+                    try:
+                        price = await asyncio.to_thread(MarketDataFetcher.get_price, ticker)
+                        market_data[ticker] = price
+                    except Exception:
+                        pass
+
+                if not market_data:
+                    logger.warning("Could not fetch any market data - skipping cycle")
+                    return
+
+                order_engine = AIOrderExecutionService(ai_user.id)
+
+                # Deterministic stop loss, independent of the model: sell in
+                # full any holding down more than STOP_LOSS_PCT from its
+                # average price, through the same validated trade path the
+                # agent uses. Holdings with no usable quote are left alone.
+                breaches = find_stop_loss_breaches(
+                    [
+                        {"ticker": p.ticker, "quantity": p.quantity, "avg_price": float(p.avg_price)}
+                        for p in positions
+                    ],
+                    market_data,
+                )
+                for b in breaches:
+                    reason = (
+                        f"Stop loss triggered: {b['ticker']} down {b['loss_pct']:.1%} from "
+                        f"average price ₹{b['avg_price']:,.2f} (now ₹{b['price']:,.2f}); "
+                        f"limit is {pct_label(STOP_LOSS_PCT)}. Sold {b['quantity']} shares."
+                    )
+                    row = AIDecision(
+                        action="sell", ticker=b["ticker"], quantity=b["quantity"],
+                        reasoning=reason, confidence=1.0,
+                        guardrail_status="approved",
+                    )
+                    try:
+                        await order_engine.submit(
+                            Order(
+                                user_id="ai_agent", ticker=b["ticker"], side=OrderSide.SELL,
+                                order_type=OrderType.MARKET, quantity=b["quantity"],
+                                source="ai_agent",
+                            ),
+                            market_data,
+                        )
+                    except TradeRejected as e:
+                        # e.g. shares still pending T+1 settlement, or market closed
+                        row = AIDecision(
+                            action="blocked", ticker=b["ticker"], quantity=b["quantity"],
+                            reasoning=f"Stop loss triggered for {b['ticker']} "
+                                      f"(down {b['loss_pct']:.1%}) but the sell was rejected.",
+                            guardrail_status="blocked", guardrail_reason=str(e),
+                        )
+                        logger.warning("Stop loss sell rejected for %s: %s", b["ticker"], e)
+                    except Exception:
+                        logger.error("Stop loss sell failed for %s", b["ticker"], exc_info=True)
+                        await db.rollback()
+                        continue
+                    db.add(row)
+                    await db.commit()
+
+                if breaches:
+                    # Execution used its own session; reload so the agent
+                    # sees post-sale cash and positions.
+                    await db.refresh(portfolio)
+                    result = await db.execute(
+                        select(Position)
+                        .where(Position.portfolio_id == portfolio.id)
+                        .execution_options(populate_existing=True)
+                    )
+                    positions = result.scalars().all()
+
+                # Build portfolio dict for the AI agent.
                 # cash_balance/avg_price are Decimal (the DB ledger); this
                 # dict is prompt/display/ratio input for the AI, not a
                 # source of truth for stored money, so it drops to float
                 # here rather than carrying Decimal into ratio arithmetic
                 # (agent.py's drawdown calc) mixed with Season.starting_capital,
                 # which stays float (not a money field we migrated).
+                # current_value marks holdings to market (cost basis where
+                # there is no usable quote) so the position cap and the
+                # drawdown kill switch see real portfolio value.
+                def _mark(p):
+                    price = market_data.get(p.ticker, {}).get("price")
+                    try:
+                        price = float(price)
+                    except (TypeError, ValueError):
+                        price = 0.0
+                    return price if price > 0 and price == price and price != float("inf") else float(p.avg_price)
+
                 portfolio_data = {
                     "starting_capital": season.starting_capital,
                     "current_value": float(portfolio.cash_balance) + sum(
-                        float(p.avg_price) * p.quantity for p in positions
+                        _mark(p) * p.quantity for p in positions
                     ),
                     "cash_balance": float(portfolio.cash_balance),
                     "days_remaining": days_remaining,
@@ -148,19 +235,6 @@ class AIScheduler:
                         for p in positions
                     ],
                 }
-
-                # Fetch market data for watchlist
-                market_data = {}
-                for ticker in AI_WATCHLIST:
-                    try:
-                        price = await asyncio.to_thread(MarketDataFetcher.get_price, ticker)
-                        market_data[ticker] = price
-                    except Exception:
-                        pass
-
-                if not market_data:
-                    logger.warning("Could not fetch any market data — skipping cycle")
-                    return
 
                 # Rehydrate risk memory from persisted history instead of
                 # starting fresh every cycle — AIAgent is reconstructed here
@@ -187,7 +261,6 @@ class AIScheduler:
                         }, timestamp=past.created_at)
 
                 # Run AI agent
-                order_engine = AIOrderExecutionService(ai_user.id)
                 agent = AIAgent(portfolio_data, order_engine=order_engine, risk_memory=risk_memory)
                 decision = await agent.run_cycle(market_data)
 
